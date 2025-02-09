@@ -1,0 +1,23 @@
+[package]
+name = "clai"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+aes-gcm = "0.10.3"
+base64 = "0.22.1"
+confy = "0.6.1"
+console = "0.15.10"
+ctrlc = "3.4.5"
+dialoguer = "0.11.0"
+hex = "0.4.3"
+indicatif = "0.17.11"
+rand = "0.9.0"
+reqwest = { version = "0.12.12", features = ["blocking", "json"] }
+rustyline = "15.0.0"
+serde = "1.0.217"
+termimad = "0.31.2"
+
+[dependencies.keyring]
+version = "3.6.1"
+features = ["sync-secret-service"]
