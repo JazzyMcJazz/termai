@@ -21,3 +21,11 @@ termimad = "0.31.2"
 [dependencies.keyring]
 version = "3.6.1"
 features = ["sync-secret-service"]
+
+[profile.release]
+opt-level = "z"
+lto = true
+debug = false
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
