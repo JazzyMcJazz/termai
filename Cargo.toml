@@ -3,6 +3,9 @@ name = "clai"
 version = "1.0.0"
 edition = "2021"
 
+[package.metadata]
+release_date = "2025-02-10"
+
 [dependencies]
 aes-gcm = "0.10.3"
 base64 = "0.22.1"

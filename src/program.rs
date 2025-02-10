@@ -4,6 +4,9 @@ use std::env;
 
 use crate::{ai::AI, config::Config, utils::enums::ProviderName};
 
+static VERSION: &str = env!("CARGO_PKG_VERSION");
+static RELEASE_DATE: &str = env!("RELEASE_DATE");
+
 pub struct Program {
     term: Term,
     cfg: Config,
@@ -24,6 +27,14 @@ impl Program {
     pub fn run() {
         let mut program = Program::default();
 
+        let welome_msg = style("Welcome to CLAI - Command Line AI").bold();
+        let version_msg = style(format!("version {} ({})", VERSION, RELEASE_DATE)).dim();
+        println!("\n{welome_msg}\n{version_msg}");
+
+        let model = program.cfg.active_model().unwrap_or("None".into());
+        let active_model = format!("{} {}", style("Active model:").bold(), style(model).cyan());
+        println!("\n{active_model}");
+
         if let Some(choice) = program.args.get(1) {
             program.select(&choice.to_owned());
         } else {
@@ -42,8 +53,8 @@ impl Program {
             vec!["Options", "Exit"]
         };
 
-        let model = self.cfg.active_model().unwrap_or("None".into());
-        let prompt = format!("{} {}", style("Active model:").bold(), style(model).cyan());
+        let prompt =
+            format! {"\n{} {}", style("?").green().bold(), style("What do you want to do?").bold()};
 
         let Ok(selection) = Select::new()
             .with_prompt(prompt)
@@ -53,10 +64,6 @@ impl Program {
         else {
             return;
         };
-
-        self.term
-            .clear_last_lines(1)
-            .expect("Failed to clear last line");
 
         self.select(&items[selection].to_lowercase());
     }
@@ -177,13 +184,11 @@ impl Program {
     }
 
     fn help() {
-        println!("Usage: clai [OPTION] [ARG]");
-        println!();
+        println!("\nUsage: clai [OPTION] [ARG]\n");
         println!("Options:");
         println!("  chat    [ARG]  Chat with the AI (optional string argument)");
         println!("  suggest [ARG]  Get suggestions from the AI (optional string argument)");
         println!("  explain [ARG]  Get explanations from the AI (optional string argument)");
-        println!("  options        Configure the AI");
-        println!("  exit           Exit the program");
+        println!("  options        Configure CLAI");
     }
 }
