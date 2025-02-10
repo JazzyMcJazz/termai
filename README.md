@@ -1,14 +1,16 @@
-# CLAI
+# CLAI - Command Line AI
 
 *Catchy AI-generated intro*:
 
-CLAI is a CLI AI that brings the power of artificial intelligence right to your terminal. Imagine having an intelligent assistant that can chat, suggest commands, and explain complex CLI instructions without ever having to leave your terminal. Boost your productivity and streamline your workflow with CLAI!
+CLAI is a Command Line AI that brings the power of artificial intelligence right to your terminal. Imagine having an intelligent assistant that can chat, suggest commands, and explain complex CLI instructions without ever having to leave your terminal. Boost your productivity and streamline your workflow with CLAI!
+
+CLAI is packed with features designed to make your command line experience smarter and more efficient. With CLAI, you can engage in natural language conversations, get instant command suggestions tailored to your needs, and receive detailed explanations of complex commands. Whether you're a seasoned developer or a command line novice, CLAI is here to assist you every step of the way.
 
 ### Before getting started
 
 Currently, the software can only be built from source using Rust. Pre-built binaries are not available at this time (sorry, no `.exe` file).
 
-The software has only been tested on Linux (specifically Ubuntu 22.04 and later) and will most likely not work on other platforms. There are currently no plans to support other platforms in the future.
+The software has only been tested on **Linux** (specifically Ubuntu 22.04 and later) and will most likely not work on other platforms. There are currently no plans to support other platforms in the future.
 
 ### Supported Providers
 
@@ -37,23 +39,35 @@ First, clone the repository to your local machine using the following command:
 git clone https://github.com/JazzyMcJazz/clai.git
 ```
 
-### Run the Installation Script (Linux only)
+### Install the application
 
-Navigate to the project directory and run the installation script:
+Navigate to the project directory and run the installation command:
 
 ```sh
 cd clai
-chmod +x install.sh
-./install.sh
+cargo install --path .
 ```
-
-This will prompt you to build or skip building the project. It must be built the first time and whenever updates have been fetched. After the installation, the script will prompt you to create aliases. If you accept, it will add the aliases `chat`, `suggest`, and `explain` to your `.bash_aliases`.
-
-The installation script builds the binary and copies it to `/usr/local/bin`.
 
 ### You're all set!
 
-You can now start using the project. For further instructions, refer to the documentation below.
+You can now start using the project. For further instructions, refer to the [usage section](#usage).
+
+### Getting updates
+
+To keep your installation up to date, navigate to the project directory and pull the latest commits from the repository:
+
+```sh
+cd clai
+git pull origin main
+```
+
+After pulling the latest changes, reinstall the application:
+
+```sh
+cargo install --path .
+```
+
+This will ensure you have the latest features and bug fixes.
 
 # Usage 
 
