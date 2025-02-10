@@ -9,77 +9,101 @@ use crate::{
     utils::{commands::copy_to_clipboard, term_tools::get_spinner_style},
 };
 
-pub fn suggest(provider: &Provider, query: Option<String>) {
-    let query = query.unwrap_or_else(|| {
-        let prompt = format!{"{} {}", style("?").green().bold(), style("What would you like the shell command to to?\n").bold()};
-        dialoguer::Input::<String>::new()
-            .with_prompt(prompt)
-            .allow_empty(false)
-            .interact().unwrap_or_default()
-    });
+pub fn suggest(provider: &Provider, mut initial_query: Option<String>) {
+    let mut last_suggestion = None::<String>;
+    let mut should_exit = false;
 
-    if query.trim().is_empty() {
-        return;
-    }
+    while !should_exit {
+        // Prevent the loop from rerunning if Ctrl+C is pressed
+        should_exit = true;
 
-    println!();
+        let query = initial_query.clone().unwrap_or_else(|| {
+            println!();
+            let msg = if last_suggestion.is_some() {
+                "How should this be revised?\n"
+            } else {
+                "What would you like the shell command to do?\n"
+            };
+            let prompt = format! {"{} {}", style("?").green().bold(), style(msg).bold()};
+            dialoguer::Input::<String>::new()
+                .with_prompt(prompt)
+                .allow_empty(false)
+                .interact()
+                .unwrap_or_default()
+        });
 
-    let spinner = ProgressBar::new_spinner();
-    spinner.set_style(get_spinner_style());
-    spinner.enable_steady_tick(Duration::from_millis(100));
-    spinner.set_message(style("Thinking...").dim().bold().to_string());
+        initial_query = None;
 
-    let suggested_command = provider.suggest(&query).clone();
-    // let suggested_command = "git commit -m \"Add new feature\"";
+        if query.trim().is_empty() {
+            return;
+        }
 
-    spinner.finish_and_clear();
+        println!();
 
-    let header = style("Suggestion:").bold();
-    let suggestion = style(suggested_command.clone())
-        .yellow()
-        .on_color256(235)
-        .bold();
-    println!("{}\n\n  {}\n", header, suggestion);
+        let spinner = ProgressBar::new_spinner();
+        spinner.set_style(get_spinner_style());
+        spinner.enable_steady_tick(Duration::from_millis(100));
+        spinner.set_message(style("Thinking...").dim().bold().to_string());
 
-    let options = vec![
-        "Copy command to clipboard",
-        "Explain command",
-        // "Revise command",
-        // "New command",
-        "Exit",
-    ];
-
-    loop {
-        let prompt = format! {"{} {}", style("?").green().bold(), style("Select an option").bold()};
-        let Ok(selection) = dialoguer::Select::new()
-            .with_prompt(prompt)
-            .items(&options)
-            .default(0)
-            .interact()
-        else {
-            break;
+        let suggested_command = if let Some(last_suggestion) = last_suggestion.clone() {
+            provider.revise(&last_suggestion, &query)
+        } else {
+            provider.suggest(&query).clone()
         };
 
-        match selection {
-            0 => {
-                let _ = copy_to_clipboard(&suggested_command)
-                    .map_err(|e| eprintln!("{} Error: {}\n", style("✗").red().bold(), e));
+        spinner.finish_and_clear();
+
+        let header = style("Suggestion:").bold();
+        let suggestion = style(suggested_command.clone())
+            .yellow()
+            .on_color256(235)
+            .bold();
+        println!("{}\n\n  {}\n", header, suggestion);
+
+        let options = vec![
+            "Copy command to clipboard",
+            "Explain command",
+            "Revise command",
+            "New command",
+            "Exit",
+        ];
+
+        loop {
+            let prompt =
+                format! {"{} {}", style("?").green().bold(), style("Select an option").bold()};
+            let Ok(selection) = dialoguer::Select::new()
+                .with_prompt(prompt)
+                .items(&options)
+                .default(0)
+                .interact()
+            else {
                 break;
-            }
-            1 => {
-                ai::explain(provider, Some(suggested_command.clone()));
-                std::thread::sleep(Duration::from_millis(500));
-            }
-            // 2 => {
-            //     term.write_line("[unimplemented] Command revised").expect("Failed to write line");
-            //     break;
-            // }
-            // 3 => {
-            //     term.write_line("[unimplemented] New command").expect("Failed to write line");
-            //     break;
-            // }
-            _ => {
-                break;
+            };
+
+            match selection {
+                0 => {
+                    let _ = copy_to_clipboard(&suggested_command)
+                        .map_err(|e| eprintln!("{} Error: {}\n", style("✗").red().bold(), e));
+                    return; // Exit
+                }
+                1 => {
+                    ai::explain(provider, Some(suggested_command.clone()));
+                    std::thread::sleep(Duration::from_millis(500));
+                    continue; // Continue to the next iteration of the inner loop
+                }
+                2 => {
+                    last_suggestion = Some(suggested_command.clone());
+                    should_exit = false;
+                    break; // Continue to the next iteration of the outer loop
+                }
+                3 => {
+                    last_suggestion = None;
+                    should_exit = false;
+                    break; // Continue to the next iteration of the outer loop
+                }
+                _ => {
+                    return; // Exit
+                }
             }
         }
     }

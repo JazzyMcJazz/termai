@@ -58,6 +58,10 @@ impl Provider {
         Client::suggest(query, self)
     }
 
+    pub fn revise(&self, command_to_revise: &str, query: &str) -> String {
+        Client::revise(command_to_revise, query, self)
+    }
+
     pub fn explain(&self, query: &str) -> String {
         Client::explain(query, self)
     }
