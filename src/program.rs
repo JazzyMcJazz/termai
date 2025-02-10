@@ -134,7 +134,7 @@ impl Program {
                 return;
             }
             "version" | "--version" => {
-                println!("AI v0.1.0");
+                println!("CLAI v1.0.0");
                 return;
             }
             "exit" => return,
@@ -177,12 +177,13 @@ impl Program {
     }
 
     fn help() {
-        println!("Usage: ai [OPTION]");
+        println!("Usage: clai [OPTION] [ARG]");
         println!();
         println!("Options:");
-        println!("  chat     Chat with the AI");
-        println!("  suggest  Get suggestions from the AI");
-        println!("  explain  Get explanations from the AI");
-        println!("  configs  Configure the AI");
+        println!("  chat    [ARG]  Chat with the AI (optional string argument)");
+        println!("  suggest [ARG]  Get suggestions from the AI (optional string argument)");
+        println!("  explain [ARG]  Get explanations from the AI (optional string argument)");
+        println!("  options        Configure the AI");
+        println!("  exit           Exit the program");
     }
 }
