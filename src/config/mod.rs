@@ -1,3 +1,4 @@
+use console::style;
 use serde::{Deserialize, Serialize};
 
 use crate::{provider::Provider, utils::enums::ProviderName};
@@ -13,7 +14,14 @@ impl Config {
         let mut cfg: Config = confy::load("clai", "config").unwrap_or_default();
 
         if let Some(openai) = cfg.openai.as_mut() {
-            openai.decrypt();
+            match openai.decrypt() {
+                Ok(_) => {}
+                Err(e) => {
+                    let cross = style("✗").red().bold();
+                    eprintln!("{cross} Failed to decrypt API key: {e}");
+                    std::process::exit(1);
+                }
+            }
         }
 
         cfg
@@ -103,7 +111,14 @@ impl Config {
         let mut cfg = self.clone();
 
         if let Some(openai) = cfg.openai.as_mut() {
-            openai.encrypt();
+            match openai.encrypt() {
+                Ok(_) => {}
+                Err(e) => {
+                    let cross = style("✗").red().bold();
+                    eprintln!("{cross} Failed to encrypt API key: {e}");
+                    std::process::exit(1);
+                }
+            }
         }
 
         confy::store("clai", "config", cfg).expect("Failed to save configuration");

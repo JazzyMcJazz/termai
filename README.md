@@ -48,7 +48,15 @@ To get started with this project, follow the steps below.
 ### Requirements
 
 - git
-- rust
+- the Rust programming language
+
+#### Linux 
+
+On Linux you may need to install additional packages for compilation to finish successfully:
+
+- `pkg-config`
+- `libssl-dev`
+- `libdbus-1-dev`
 
 ### Clone the Repository
 

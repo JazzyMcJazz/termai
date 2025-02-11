@@ -66,19 +66,23 @@ impl Provider {
         Client::explain(query, self)
     }
 
-    pub fn encrypt(&mut self) {
+    pub fn encrypt(&mut self) -> Result<(), &'static str> {
         match self {
             Provider::OpenAI(settings) => {
-                settings.api_key = Enc::encrypt(&settings.api_key);
+                settings.api_key = Enc::encrypt(&settings.api_key)?;
             }
         }
+
+        Ok(())
     }
 
-    pub fn decrypt(&mut self) {
+    pub fn decrypt(&mut self) -> Result<(), &'static str> {
         match self {
             Provider::OpenAI(settings) => {
-                settings.api_key = Enc::decrypt(&settings.api_key);
+                settings.api_key = Enc::decrypt(&settings.api_key)?;
             }
         }
+
+        Ok(())
     }
 }
