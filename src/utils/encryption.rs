@@ -60,11 +60,8 @@ impl Enc {
             Ok(_) => Ok(key),
             Err(e) => match e {
                 keyring::Error::PlatformFailure(_) => Err("No keyring service available. Please install a keyring service such as `gnome-keyring`."),
-                keyring::Error::NoStorageAccess(e) => Err("No storage access. Please allow access to the keyring service."),
-                e => {
-                    println!("{:?}", e);
-                    Err("Unknown encryption error")
-                }
+                keyring::Error::NoStorageAccess(_) => Err("No storage access. Please allow access to the keyring service."),
+                _ => Err("Unknown encryption error"),
             }
         }
     }
