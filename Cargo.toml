@@ -1,10 +1,10 @@
 [package]
 name = "clai"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 
 [package.metadata]
-release_date = "2025-02-10"
+release_date = "2025-02-11"
 
 [dependencies]
 aes-gcm = "0.10.3"
