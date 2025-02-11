@@ -102,7 +102,7 @@ You can setup a provider by running `clai` and selecting `Options`. After settin
 
 **Quick access**: `clai chat`
 
-**Quicker access** `clai chat "hello world"` 
+**Quicker access** `clai chat hello world` 
 
 ***
 
@@ -112,7 +112,7 @@ You can setup a provider by running `clai` and selecting `Options`. After settin
 
 **Quick access**: `clai suggest`
 
-**Quicker access**: `clai suggest "list all files"`
+**Quicker access**: `clai suggest list all files`
 
 ***
 
@@ -122,7 +122,7 @@ You can setup a provider by running `clai` and selecting `Options`. After settin
 
 **Quick access**: `clai explain`
 
-**Quicker access**: `clai explain "ls -alF"`
+**Quicker access**: `clai explain ls -alF`
 
 # Disclaimer
 

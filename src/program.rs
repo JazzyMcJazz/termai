@@ -159,14 +159,18 @@ impl Program {
             println!("  Run `clai options` to configure a provider");
             return;
         };
-
-        let arg = self.args.get(2).map(|arg| arg.to_owned());
+        
+        let rest_args = if self.args.len() > 2 {
+            Some(self.args[2..].join(" "))
+        } else {
+            None
+        };
 
         let ai = AI(&self.term);
         match choice {
-            "chat" => ai.chat(&provider, arg),
-            "suggest" => ai.suggest(&provider, arg),
-            "explain" => ai.explain(&provider, arg),
+            "chat" => ai.chat(&provider, rest_args),
+            "suggest" => ai.suggest(&provider, rest_args),
+            "explain" => ai.explain(&provider, rest_args),
             _ => Program::help(),
         }
     }
