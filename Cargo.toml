@@ -30,7 +30,7 @@ termimad = "0.31.2"
 
 [dependencies.keyring]
 version = "3.6.1"
-features = ["sync-secret-service"]
+features = ["sync-secret-service", "apple-native", "windows-native"]
 
 [profile.release]
 opt-level = "z"
