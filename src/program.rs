@@ -27,7 +27,7 @@ impl Program {
     pub fn run() {
         let mut program = Program::default();
 
-        let welome_msg = style("Welcome to CLAI - Command Line AI").bold();
+        let welome_msg = style("Welcome to TermAI - Command Line AI").bold();
         let version_msg = style(format!("version {} ({})", VERSION, RELEASE_DATE)).dim();
         println!("\n{welome_msg}\n{version_msg}");
 
@@ -141,7 +141,7 @@ impl Program {
                 return;
             }
             "version" | "--version" => {
-                println!("CLAI v1.0.0");
+                println!("TermAI v{} ({})", VERSION, RELEASE_DATE);
                 return;
             }
             "exit" => return,
@@ -156,7 +156,7 @@ impl Program {
             let cross = style("✗").red().bold();
             let msg = style("You need to configure a provider first").bold();
             println!("{cross} {msg} {cross}", cross = cross, msg = msg);
-            println!("  Run `clai options` to configure a provider");
+            println!("  Run `termai options` to configure a provider");
             return;
         };
         
@@ -188,11 +188,11 @@ impl Program {
     }
 
     fn help() {
-        println!("\nUsage: clai [OPTION] [ARG]\n");
+        println!("\nUsage: termai [OPTION] [ARG]\n");
         println!("Options:");
         println!("  chat    [ARG]  Chat with the AI (optional string argument)");
         println!("  suggest [ARG]  Get suggestions from the AI (optional string argument)");
         println!("  explain [ARG]  Get explanations from the AI (optional string argument)");
-        println!("  options        Configure CLAI");
+        println!("  options        Configure TermAI");
     }
 }

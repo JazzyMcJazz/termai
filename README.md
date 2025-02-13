@@ -1,13 +1,13 @@
-# CLAI - Command Line AI
+# TermAI - A Command Line AI Assistant
 
 *Catchy AI-generated intro*:
 
-CLAI is a Command Line AI that brings the power of artificial intelligence right to your terminal. Imagine having an intelligent assistant that can chat, suggest commands, and explain complex CLI instructions without ever having to leave your terminal. Boost your productivity and streamline your workflow with CLAI!
+TermAI is a Command Line AI that brings the power of artificial intelligence right to your terminal. Imagine having an intelligent assistant that can chat, suggest commands, and explain complex CLI instructions without ever having to leave your terminal. Boost your productivity and streamline your workflow with TermAI!
 
-CLAI is packed with features designed to make your command line experience smarter and more efficient. With CLAI, you can engage in natural language conversations, get instant command suggestions tailored to your needs, and receive detailed explanations of complex commands. Whether you're a seasoned developer or a command line novice, CLAI is here to assist you every step of the way.
+TermAI is packed with features designed to make your command line experience smarter and more efficient. With TermAI, you can engage in natural language conversations, get instant command suggestions tailored to your needs, and receive detailed explanations of complex commands. Whether you're a seasoned developer or a command line novice, TermAI is here to assist you every step of the way.
 
 ### Table of contents
-- [Introduction](#clai---command-line-ai)
+- [Introduction](#termai---a-command-line-ai-assistant)
     - [Table of contents](#table-of-contents)
     - [Before getting started](#before-getting-started)
     - [Supported Providers](#supported-providers)
@@ -24,12 +24,6 @@ CLAI is packed with features designed to make your command line experience smart
         - [explain](#explain)
 - [Disclaimer](#disclaimer)
     - [Disclaimer on AI-Generated Content](#disclaimer-on-ai-generated-content)
-
-### Before getting started
-
-Currently, the software can only be built from source using Rust. Pre-built binaries are not available at this time (sorry, no `.exe` file).
-
-The software has only been tested on **Linux** (specifically Ubuntu 22.04 and later) and will most likely not work on other platforms. There are currently no plans to support other platforms in the future.
 
 ### Supported Providers
 
@@ -58,49 +52,25 @@ On Linux you may need to install additional packages for compilation to finish s
 - `libssl-dev`
 - `libdbus-1-dev`
 
-### Clone the Repository
-
-First, clone the repository to your local machine using the following command:
-
-```sh
-git clone https://github.com/JazzyMcJazz/clai.git
-```
-
 ### Install the application
 
-Navigate to the project directory and run the installation command:
+Use Cargo to install
 
 ```sh
-cd clai
-cargo install --path .
+cargo install termai
 ```
 
 ### You're all set!
 
 You can now start using the project. For further instructions, refer to the [usage section](#usage).
 
-### Getting updates
-
-To keep your installation up to date, navigate to the project directory and pull the latest commits from the repository:
-
-```sh
-cd clai
-git pull origin main
-```
-
-After pulling the latest changes, reinstall the application:
-
-```sh
-cargo install --path .
-```
-
-This will ensure you have the latest features and bug fixes.
+To update to the latest version, simply use the same command.
 
 # Usage 
 
-Run `clai` to start the program. Initially you will have to setup a provider with an API key. API keys are encrypted and stored securely and never leave your machine, except when used to authenticate with LLM providers.
+Run `termai` to start the program. Initially you will have to setup a provider with an API key. API keys are encrypted and stored securely and never leave your machine, except when used to authenticate with LLM providers.
 
-You can setup a provider by running `clai` and selecting `Options`. After setting up a provider you can change the model by going back into the Options menu.
+You can setup a provider by running `termai` and selecting `Options`. After setting up a provider you can change the model by going back into the Options menu.
 
 ## Key Features
 
@@ -108,9 +78,9 @@ You can setup a provider by running `clai` and selecting `Options`. After settin
 
 *Start a conversational style chat with the AI. Conversations are forgotten when the program exits.*
 
-**Quick access**: `clai chat`
+**Quick access**: `termai chat`
 
-**Quicker access** `clai chat hello world` 
+**Quicker access** `termai chat hello world` 
 
 ***
 
@@ -118,9 +88,9 @@ You can setup a provider by running `clai` and selecting `Options`. After settin
 
 *Get a suggested CLI command based on your input.*
 
-**Quick access**: `clai suggest`
+**Quick access**: `termai suggest`
 
-**Quicker access**: `clai suggest list all files`
+**Quicker access**: `termai suggest list all files`
 
 ***
 
@@ -128,14 +98,14 @@ You can setup a provider by running `clai` and selecting `Options`. After settin
 
 *Get a CLI command explained*
 
-**Quick access**: `clai explain`
+**Quick access**: `termai explain`
 
-**Quicker access**: `clai explain ls -alF`
+**Quicker access**: `termai explain ls -alF`
 
 # Disclaimer
 
-CLAI is provided "as is", without warranty of any kind, as stated in the MIT License. The developers and contributors are not liable for any loss of API keys, data, or any other issues that may arise from using this software. Use it at your own risk.
+TermAI is provided "as is", without warranty of any kind, as stated in the MIT License. The developers and contributors are not liable for any loss of API keys, data, or any other issues that may arise from using this software. Use it at your own risk.
 
 ### Disclaimer on AI-Generated Content
 
-The content generated by CLAI's AI functionalities, including but not limited to chat responses, command suggestions, and explanations, is provided for informational purposes only. The developers and contributors of CLAI do not guarantee the accuracy, completeness, or usefulness of any AI-generated content. Users are advised to verify the information independently and use it at their own discretion. The developers and contributors are not responsible for any consequences resulting from the use of AI-generated content.
+The content generated by TermAI's AI functionalities, including but not limited to chat responses, command suggestions, and explanations, is provided for informational purposes only. The developers and contributors of TermAI do not guarantee the accuracy, completeness, or usefulness of any AI-generated content. Users are advised to verify the information independently and use it at their own discretion. The developers and contributors are not responsible for any consequences resulting from the use of AI-generated content.

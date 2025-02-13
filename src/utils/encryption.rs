@@ -47,7 +47,7 @@ impl Enc {
     }
 
     fn get_encryption_key() -> Result<Vec<u8>, &'static str> {
-        let entry = Entry::new("clai", "encryption_key").expect("Failed to create keyring entry");
+        let entry = Entry::new("termai", "encryption_key").expect("Failed to create keyring entry");
 
         if let Ok(key) = entry.get_secret() {
             return Ok(key);

@@ -11,7 +11,7 @@ pub struct Config {
 
 impl Config {
     pub fn load() -> Self {
-        let mut cfg: Config = confy::load("clai", "config").unwrap_or_default();
+        let mut cfg: Config = confy::load("termai", "config").unwrap_or_default();
 
         if let Some(openai) = cfg.openai.as_mut() {
             match openai.decrypt() {
@@ -121,6 +121,6 @@ impl Config {
             }
         }
 
-        confy::store("clai", "config", cfg).expect("Failed to save configuration");
+        confy::store("termai", "config", cfg).expect("Failed to save configuration");
     }
 }

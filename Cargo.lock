@@ -150,26 +150,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "clai"
-version = "1.0.1"
-dependencies = [
- "aes-gcm",
- "base64",
- "confy",
- "console",
- "ctrlc",
- "dialoguer",
- "hex",
- "indicatif",
- "keyring",
- "rand 0.9.0",
- "reqwest",
- "rustyline",
- "serde",
- "termimad",
-]
-
-[[package]]
 name = "clipboard-win"
 version = "5.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1926,6 +1906,26 @@ dependencies = [
  "once_cell",
  "rustix",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "termai"
+version = "0.0.1"
+dependencies = [
+ "aes-gcm",
+ "base64",
+ "confy",
+ "console",
+ "ctrlc",
+ "dialoguer",
+ "hex",
+ "indicatif",
+ "keyring",
+ "rand 0.9.0",
+ "reqwest",
+ "rustyline",
+ "serde",
+ "termimad",
 ]
 
 [[package]]

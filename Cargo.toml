@@ -1,10 +1,17 @@
 [package]
-name = "clai"
-version = "1.0.1"
+name = "termai"
+version = "0.0.1"
 edition = "2021"
+license = "MIT"
+description = "AI assistant for the terminal"
+homepage = "https://github.com/JazzyMcJazz/termai"
+repository = "https://github.com/JazzyMcJazz/termai"
+readme = "README.md"
+keywords = ["ai", "assistant", "terminal", "chatbot", "cli", "rust", "openai"]
+categories = ["command-line-utilities"]
 
 [package.metadata]
-release_date = "2025-02-11"
+release_date = "2025-02-13"
 
 [dependencies]
 aes-gcm = "0.10.3"
