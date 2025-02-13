@@ -7,7 +7,7 @@ description = "AI assistant for the terminal"
 homepage = "https://github.com/JazzyMcJazz/termai"
 repository = "https://github.com/JazzyMcJazz/termai"
 readme = "README.md"
-keywords = ["ai", "assistant", "terminal", "chatbot", "cli", "rust", "openai"]
+keywords = ["ai", "assistant", "terminal", "chatbot", "cli"]
 categories = ["command-line-utilities"]
 
 [package.metadata]
