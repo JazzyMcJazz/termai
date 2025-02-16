@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    client::{ChatMessage, Client},
+    client::{ChatMessage, Client, ContentIterator},
     utils::{encryption::Enc, enums::ProviderName},
 };
 
@@ -52,6 +52,10 @@ impl Provider {
 
     pub fn chat(&self, messages: &[ChatMessage]) -> String {
         Client::chat(messages, self)
+    }
+
+    pub fn chat_stream(&self, messages: &[ChatMessage]) -> ContentIterator {
+        Client::chat_stream(messages, self)
     }
 
     pub fn suggest(&self, query: &str) -> String {

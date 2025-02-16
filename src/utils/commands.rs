@@ -6,7 +6,9 @@ pub fn copy_to_clipboard(input: &str) -> Result<(), &'static str> {
             .args(["/C", "clip"])
             .stdin(std::process::Stdio::piped())
             .spawn()
-            .map_err(|_| "Failed to start clip command. Ensure 'clip' is available in your system path.")?;
+            .map_err(|_| {
+                "Failed to start clip command. Ensure 'clip' is available in your system path."
+            })?;
 
         cmd.stdin
             .as_mut()
@@ -38,7 +40,9 @@ pub fn copy_to_clipboard(input: &str) -> Result<(), &'static str> {
             .write_all(input.as_bytes())
             .map_err(|_| "Failed to write to pbcopy")?;
     } else {
-        return Err("Unsupported OS. Clipboard functionality is not implemented for this platform.");
+        return Err(
+            "Unsupported OS. Clipboard functionality is not implemented for this platform.",
+        );
     }
 
     Ok(())

@@ -1,3 +1,4 @@
+pub mod changelog;
 pub mod commands;
 pub mod encryption;
 pub mod enums;

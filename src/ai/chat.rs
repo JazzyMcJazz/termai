@@ -11,7 +11,12 @@ use crate::{
     utils::term_tools::get_spinner_style,
 };
 
-pub fn chat(term: &Term, provider: &Provider, mut initial_message: Option<String>) {
+pub fn chat(
+    term: &Term,
+    provider: &Provider,
+    mut initial_message: Option<String>,
+    streaming: bool,
+) {
     let exit_words = [
         "exit".into(),
         "q".into(),
@@ -43,7 +48,6 @@ pub fn chat(term: &Term, provider: &Provider, mut initial_message: Option<String
         if let Some(message) = initial_message.take() {
             println!("{message}");
             input = message;
-            initial_message = None;
         } else {
             println!();
             while input.trim().is_empty() {
@@ -79,12 +83,50 @@ pub fn chat(term: &Term, provider: &Provider, mut initial_message: Option<String
             content: input.trim().into(),
             refusal: None,
         });
-        let response = provider.chat(&messages);
 
-        // Stop the spinner and display a final message.
-        spinner.finish_and_clear();
+        if streaming {
+            let mut response = String::new();
+            let content_iter = provider.chat_stream(&messages);
+            let mut line_count = 0;
+            let term_width = term.size().1 as usize;
 
-        println!("{ai}");
-        skin.print_text(&response);
+            term.hide_cursor().expect("Failed to hide cursor");
+
+            for (i, content) in content_iter.enumerate() {
+                if i == 0 {
+                    spinner.finish_and_clear();
+                    println!("{ai}");
+                }
+
+                response.push_str(&content);
+
+                let text = skin.text(&response, None);
+                let mut new_line_count = text.lines.len();
+
+                for line in text.to_string().lines() {
+                    if line.len() > term_width {
+                        new_line_count += line.len() / term_width;
+                    }
+                }
+
+                if line_count > 0 {
+                    term.clear_last_lines(line_count)
+                        .expect("Failed to clear lines");
+                }
+
+                skin.print_text(&response);
+
+                line_count = new_line_count;
+            }
+
+            term.show_cursor().expect("Failed to show cursor");
+            term.flush().expect("Failed to flush terminal");
+        } else {
+            let response = provider.chat(&messages);
+
+            spinner.finish_and_clear();
+            println!("{ai}");
+            skin.print_text(&response);
+        }
     }
 }

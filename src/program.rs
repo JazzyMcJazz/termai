@@ -2,7 +2,11 @@ use console::{style, Term};
 use dialoguer::Select;
 use std::env;
 
-use crate::{ai::AI, config::Config, utils::enums::ProviderName};
+use crate::{
+    ai::AI,
+    config::Config,
+    utils::{changelog, enums::ProviderName},
+};
 
 static VERSION: &str = env!("CARGO_PKG_VERSION");
 static RELEASE_DATE: &str = env!("RELEASE_DATE");
@@ -27,7 +31,7 @@ impl Program {
     pub fn run() {
         let mut program = Program::default();
 
-        let welome_msg = style("Welcome to TermAI - Command Line AI").bold();
+        let welome_msg = style("Welcome to TermAI - Your AI in the Terminal").bold();
         let version_msg = style(format!("version {} ({})", VERSION, RELEASE_DATE)).dim();
         println!("\n{welome_msg}\n{version_msg}");
 
@@ -48,9 +52,9 @@ impl Program {
 
     fn main_menu(&mut self) {
         let items = if self.cfg.active_provider_name().is_some() {
-            vec!["Chat", "Suggest", "Explain", "Options", "Exit"]
+            vec!["Chat", "Suggest", "Explain", "Options", "Changelog", "Exit"]
         } else {
-            vec!["Options", "Exit"]
+            vec!["Options", "Changelog", "Exit"]
         };
 
         let prompt =
@@ -69,13 +73,25 @@ impl Program {
     }
 
     fn options_menu(&mut self) {
-        let items = vec!["Configure providers"];
+        let items = if self.cfg.active_provider_name().is_some() {
+            let stream_choice = if self.cfg.streaming() {
+                "Disable streaming"
+            } else {
+                "Enable streaming (experimental)"
+            };
+            vec!["Providers", "Change Model", stream_choice]
+        } else {
+            vec!["Providers"]
+        };
+
         let Ok(selection) = Select::new().items(&items).default(0).interact() else {
             return;
         };
 
         match selection {
             0 => self.provider_menu(),
+            1 => self.select_model_menu(self.cfg.active_provider_name().unwrap()),
+            2 => self.cfg.toggle_streaming(),
             _ => unreachable!(),
         }
     }
@@ -90,28 +106,22 @@ impl Program {
     }
 
     fn provider_inner_menu(&mut self, provider: ProviderName) {
-        let choices = if self.cfg.is_configured(provider) {
+        let items = if self.cfg.is_configured(provider) {
             if self.cfg.active_provider_name() == Some(provider) {
-                vec!["Change API Key", "Change Model", "Remove provider"]
+                vec!["Change API Key", "Remove provider"]
             } else {
-                vec![
-                    "Change API Key",
-                    "Change Model",
-                    "Remove provider",
-                    "Set as active",
-                ]
+                vec!["Change API Key", "Remove Provider", "Set as active"]
             }
         } else {
             vec!["Add API Key"]
         };
 
-        let Ok(selection) = Select::new().items(&choices).default(0).interact() else {
+        let Ok(selection) = Select::new().items(&items).default(0).interact() else {
             return;
         };
 
         match selection {
             0 => self.configure_provider(provider),
-            1 => self.select_model_menu(provider),
             2 => self.cfg.remove_provider(provider),
             3 => self.cfg.set_active_provider(provider),
             _ => unreachable!(),
@@ -144,6 +154,10 @@ impl Program {
                 println!("TermAI v{} ({})", VERSION, RELEASE_DATE);
                 return;
             }
+            "changelog" => {
+                changelog::print_latest();
+                return;
+            }
             "exit" => return,
             "chat" | "suggest" | "explain" => {}
             _ => {
@@ -159,7 +173,7 @@ impl Program {
             println!("  Run `termai options` to configure a provider");
             return;
         };
-        
+
         let rest_args = if self.args.len() > 2 {
             Some(self.args[2..].join(" "))
         } else {
@@ -168,7 +182,7 @@ impl Program {
 
         let ai = AI(&self.term);
         match choice {
-            "chat" => ai.chat(&provider, rest_args),
+            "chat" => ai.chat(&provider, rest_args, self.cfg.streaming()),
             "suggest" => ai.suggest(&provider, rest_args),
             "explain" => ai.explain(&provider, rest_args),
             _ => Program::help(),

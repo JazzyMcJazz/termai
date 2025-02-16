@@ -7,6 +7,7 @@ use crate::{provider::Provider, utils::enums::ProviderName};
 pub struct Config {
     openai: Option<Provider>,
     active_provider: Option<ProviderName>,
+    pub use_streaming: bool,
 }
 
 impl Config {
@@ -25,6 +26,15 @@ impl Config {
         }
 
         cfg
+    }
+
+    pub fn streaming(&self) -> bool {
+        self.use_streaming
+    }
+
+    pub fn toggle_streaming(&mut self) {
+        self.use_streaming = !self.use_streaming;
+        self.save();
     }
 
     pub fn is_configured(&self, provider_name: ProviderName) -> bool {

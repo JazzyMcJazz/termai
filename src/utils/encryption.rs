@@ -42,7 +42,8 @@ impl Enc {
             .decrypt(nonce, ciphertext)
             .expect("Failed to decrypt data");
 
-        let decrypted = String::from_utf8(decrypted).expect("Failed to convert decrypted data to string");
+        let decrypted =
+            String::from_utf8(decrypted).expect("Failed to convert decrypted data to string");
         Ok(decrypted)
     }
 
@@ -55,7 +56,7 @@ impl Enc {
 
         let mut key = vec![0u8; 32];
         rand::rng().fill_bytes(&mut key);
-    
+
         match entry.set_secret(&key) {
             Ok(_) => Ok(key),
             Err(e) => match e {

@@ -1,8 +1,12 @@
+use std::io::BufReader;
+
+use reqwest::blocking::{Client, RequestBuilder};
+
 use crate::provider::ProviderSettings;
 
 use super::{
     constants::{CHAT_SYSTEM_MESSAGE, EXPLAIN_SYSTEM_PROMT, SUGGEST_SYSTEM_PROMT},
-    models::{ChatMessage, ChatRequest, ChatResponse},
+    models::{AggregateChoice, ChatMessage, ChatRequest, ChatResponse, ContentIterator},
     ChatRole,
 };
 
@@ -22,36 +26,46 @@ impl OpenAiClient {
 
         msg.extend(messages.iter().cloned());
 
-        let client = reqwest::blocking::Client::new();
+        let client = Client::new();
         let req = client
             .post(URL)
             .header("Content-Type", "application/json")
             .bearer_auth(api_key)
             .json(&ChatRequest {
+                stream: false,
                 model,
                 messages: msg,
             });
 
-        let res: ChatResponse = match req.send() {
-            Ok(res) => match res.json() {
-                Ok(json) => json,
-                Err(e) => {
-                    eprintln!("Failed to parse response: {}", e);
-                    return String::new();
-                }
-            },
-            Err(e) => {
-                eprintln!("Failed to send request: {}", e);
-                return String::new();
-            }
-        };
+        Self::handle_request(req)
+    }
 
-        if let Some(choice) = res.choices.first() {
-            choice.message.content.clone()
-        } else {
-            eprintln!("No response from server");
-            String::new()
-        }
+    pub fn chat_stream(messages: &[ChatMessage], settings: &ProviderSettings) -> ContentIterator {
+        let (api_key, model) = settings.get();
+
+        let mut msg = Vec::from([ChatMessage {
+            role: ChatRole::System,
+            content: CHAT_SYSTEM_MESSAGE.into(),
+            refusal: None,
+        }]);
+
+        msg.extend(messages.iter().cloned());
+
+        let client = Client::new();
+        let res = client
+            .post(URL)
+            .header("Content-Type", "application/json")
+            .bearer_auth(api_key)
+            .json(&ChatRequest {
+                stream: true,
+                model,
+                messages: msg,
+            })
+            .send()
+            .unwrap();
+
+        let reader = BufReader::new(res);
+        ContentIterator::new(reader)
     }
 
     pub fn suggest(query: &str, settings: &ProviderSettings) -> String {
@@ -63,6 +77,7 @@ impl OpenAiClient {
             .header("Content-Type", "application/json")
             .bearer_auth(api_key)
             .json(&ChatRequest {
+                stream: false,
                 model,
                 messages: vec![
                     ChatMessage {
@@ -78,26 +93,7 @@ impl OpenAiClient {
                 ],
             });
 
-        let res: ChatResponse = match req.send() {
-            Ok(res) => match res.json() {
-                Ok(json) => json,
-                Err(e) => {
-                    eprintln!("Failed to parse response: {}", e);
-                    return String::new();
-                }
-            },
-            Err(e) => {
-                eprintln!("Failed to send request: {}", e);
-                return String::new();
-            }
-        };
-
-        if let Some(choice) = res.choices.first() {
-            choice.message.content.clone()
-        } else {
-            eprintln!("No response from server");
-            String::new()
-        }
+        Self::handle_request(req)
     }
 
     pub fn revise(command_to_revise: &str, query: &str, settings: &ProviderSettings) -> String {
@@ -109,6 +105,7 @@ impl OpenAiClient {
             .header("Content-Type", "application/json")
             .bearer_auth(api_key)
             .json(&ChatRequest {
+                stream: false,
                 model,
                 messages: vec![
                     ChatMessage {
@@ -129,26 +126,7 @@ impl OpenAiClient {
                 ],
             });
 
-        let res: ChatResponse = match req.send() {
-            Ok(res) => match res.json() {
-                Ok(json) => json,
-                Err(e) => {
-                    eprintln!("Failed to parse response: {}", e);
-                    return String::new();
-                }
-            },
-            Err(e) => {
-                eprintln!("Failed to send request: {}", e);
-                return String::new();
-            }
-        };
-
-        if let Some(choice) = res.choices.first() {
-            choice.message.content.clone()
-        } else {
-            eprintln!("No response from server");
-            String::new()
-        }
+        Self::handle_request(req)
     }
 
     pub fn explain(command: &str, settings: &ProviderSettings) -> String {
@@ -160,6 +138,7 @@ impl OpenAiClient {
             .header("Content-Type", "application/json")
             .bearer_auth(api_key)
             .json(&ChatRequest {
+                stream: false,
                 model,
                 messages: vec![
                     ChatMessage {
@@ -175,17 +154,19 @@ impl OpenAiClient {
                 ],
             });
 
-        let res: ChatResponse = match req.send() {
+        Self::handle_request(req)
+    }
+
+    fn handle_request(req: RequestBuilder) -> String {
+        let res: ChatResponse<AggregateChoice> = match req.send() {
             Ok(res) => match res.json() {
                 Ok(json) => json,
                 Err(e) => {
-                    eprintln!("Failed to parse response: {}", e);
-                    return String::new();
+                    return format!("Failed to parse response: {}", e);
                 }
             },
             Err(e) => {
-                eprintln!("Failed to send request: {}", e);
-                return String::new();
+                return format!("Failed to send request: {}", e);
             }
         };
 

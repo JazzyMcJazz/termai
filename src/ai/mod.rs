@@ -12,8 +12,8 @@ use crate::provider::Provider;
 pub struct AI<'a>(pub &'a Term);
 
 impl AI<'_> {
-    pub fn chat(&self, provider: &Provider, initial_message: Option<String>) {
-        chat(self.0, provider, initial_message);
+    pub fn chat(&self, provider: &Provider, initial_message: Option<String>, streaming: bool) {
+        chat(self.0, provider, initial_message, streaming);
     }
 
     pub fn explain(&self, provider: &Provider, query: Option<String>) {
