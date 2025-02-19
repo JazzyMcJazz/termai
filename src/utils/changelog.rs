@@ -15,7 +15,7 @@ pub fn print_latest() {
 
     if let Some(latest) = latest {
         let skin = MadSkin::default();
-        let text = format!("# CHANGELOG\n\n## {}\n{}", latest, SEE_MORE);
+        let text = format!("# CHANGELOG\n\n**Version {}**\n{}", latest, SEE_MORE);
         let longest_line = text
             .lines()
             .max_by_key(|line| line.len())

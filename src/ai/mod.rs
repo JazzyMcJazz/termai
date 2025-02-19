@@ -1,7 +1,9 @@
+mod ask;
 mod chat;
 mod explain;
 mod suggest;
 
+use ask::ask;
 use chat::chat;
 use console::Term;
 use explain::explain;
@@ -22,5 +24,9 @@ impl AI<'_> {
 
     pub fn suggest(&self, provider: &Provider, query: Option<String>) {
         suggest(provider, query);
+    }
+
+    pub fn ask(&self, provider: &Provider, message: Option<String>) {
+        ask(self.0, provider, message);
     }
 }

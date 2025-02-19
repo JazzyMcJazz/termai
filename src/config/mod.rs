@@ -7,6 +7,7 @@ use crate::{provider::Provider, utils::enums::ProviderName};
 pub struct Config {
     openai: Option<Provider>,
     active_provider: Option<ProviderName>,
+    #[serde(default)]
     pub use_streaming: bool,
 }
 

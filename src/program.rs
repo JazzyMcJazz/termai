@@ -52,9 +52,9 @@ impl Program {
 
     fn main_menu(&mut self) {
         let items = if self.cfg.active_provider_name().is_some() {
-            vec!["Chat", "Suggest", "Explain", "Options", "Changelog", "Exit"]
+            vec!["Chat", "Suggest", "Explain", "Ask", "Options", "Exit"]
         } else {
-            vec!["Options", "Changelog", "Exit"]
+            vec!["Options", "Exit"]
         };
 
         let prompt =
@@ -79,19 +79,23 @@ impl Program {
             } else {
                 "Enable streaming (experimental)"
             };
-            vec!["Providers", "Change Model", stream_choice]
+            vec!["Providers", "Change Model", "Changelog", stream_choice]
         } else {
-            vec!["Providers"]
+            vec!["Providers", "Changelog"]
         };
 
         let Ok(selection) = Select::new().items(&items).default(0).interact() else {
             return;
         };
 
-        match selection {
-            0 => self.provider_menu(),
-            1 => self.select_model_menu(self.cfg.active_provider_name().unwrap()),
-            2 => self.cfg.toggle_streaming(),
+        let selected_option = items[selection].to_lowercase();
+        let selected_option = selected_option.as_str();
+
+        match selected_option {
+            "providers" => self.provider_menu(),
+            "change model" => self.select_model_menu(self.cfg.active_provider_name().unwrap()),
+            "Disable streaming" | "Enable streaming (experimental)" => self.cfg.toggle_streaming(),
+            "changelog" => changelog::print_latest(),
             _ => unreachable!(),
         }
     }
@@ -159,7 +163,7 @@ impl Program {
                 return;
             }
             "exit" => return,
-            "chat" | "suggest" | "explain" => {}
+            "chat" | "suggest" | "explain" | "ask" => {}
             _ => {
                 Program::help();
                 return;
@@ -185,6 +189,7 @@ impl Program {
             "chat" => ai.chat(&provider, rest_args, self.cfg.streaming()),
             "suggest" => ai.suggest(&provider, rest_args),
             "explain" => ai.explain(&provider, rest_args),
+            "ask" => ai.ask(&provider, rest_args),
             _ => Program::help(),
         }
     }
