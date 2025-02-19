@@ -212,6 +212,7 @@ impl Program {
         println!("  chat    [ARG]  Chat with the AI (optional string argument)");
         println!("  suggest [ARG]  Get suggestions from the AI (optional string argument)");
         println!("  explain [ARG]  Get explanations from the AI (optional string argument)");
+        println!("  ask     [ARG]  Similar to chat, but the program exits after one response (optional string argument)");
         println!("  options        Configure TermAI");
     }
 }
