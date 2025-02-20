@@ -94,7 +94,7 @@ impl Program {
         match selected_option {
             "providers" => self.provider_menu(),
             "change model" => self.select_model_menu(self.cfg.active_provider_name().unwrap()),
-            "Disable streaming" | "Enable streaming (experimental)" => self.cfg.toggle_streaming(),
+            "disable streaming" | "enable streaming (experimental)" => self.cfg.toggle_streaming(),
             "changelog" => changelog::print_latest(),
             _ => unreachable!(),
         }
