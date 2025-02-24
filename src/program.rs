@@ -30,6 +30,12 @@ impl Default for Program {
 impl Program {
     pub fn run() {
         let mut program = Program::default();
+        let choice = program.args.get(1);
+
+        if choice == Some(&"--version".to_string()) {
+            println!("TermAI v{} ({})", VERSION, RELEASE_DATE);
+            return;
+        }
 
         let welome_msg = style("Welcome to TermAI - Your AI in the Terminal").bold();
         let version_msg = style(format!("version {} ({})", VERSION, RELEASE_DATE)).dim();
@@ -39,7 +45,7 @@ impl Program {
         let active_model = format!("{} {}", style("Active model:").bold(), style(model).cyan());
         println!("\n{active_model}");
 
-        if let Some(choice) = program.args.get(1) {
+        if let Some(choice) = choice {
             program.select(&choice.to_owned());
         } else {
             program.main_menu();
@@ -152,10 +158,6 @@ impl Program {
         match choice {
             "options" => {
                 self.options_menu();
-                return;
-            }
-            "version" | "--version" => {
-                println!("TermAI v{} ({})", VERSION, RELEASE_DATE);
                 return;
             }
             "changelog" => {

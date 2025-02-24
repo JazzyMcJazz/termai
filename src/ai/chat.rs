@@ -1,9 +1,13 @@
-use std::time::Duration;
+use std::{
+    io::{stdout, Write},
+    time::Duration,
+};
 
-use console::{style, Term};
-use indicatif::ProgressBar;
+use console::{strip_ansi_codes, style, Term};
+use indicatif::{ProgressBar, TermLike};
 use rustyline::DefaultEditor;
 use termimad::MadSkin;
+use textwrap::wrap;
 
 use crate::{
     client::{ChatMessage, ChatRole},
@@ -35,14 +39,16 @@ pub fn chat(
 
     let mut messages = vec![];
     if initial_message.is_none() {
-        println!("\n{ai}\nWhat can I help with?");
+        println!("\n{ai}\nWhat can I help with?\n");
+    } else {
+        println!();
     }
 
     loop {
         spinner = ProgressBar::new_spinner();
         spinner.set_style(spinner_style.clone());
 
-        println!("\n{user}");
+        println!("{user}");
 
         let mut input = String::new();
         if let Some(message) = initial_message.take() {
@@ -71,7 +77,7 @@ pub fn chat(
         if input.trim() == "clear" {
             term.clear_screen().expect("Failed to clear screen");
             messages.clear();
-            println!("{ai}\nWhat can I help with?");
+            println!("{ai}\nWhat can I help with?\n");
             continue;
         }
 
@@ -88,11 +94,12 @@ pub fn chat(
             let mut response = String::new();
             let content_iter = provider.chat_stream(&messages);
             let mut line_count = 0;
-            let term_width = term.size().1 as usize;
 
             term.hide_cursor().expect("Failed to hide cursor");
 
             for (i, content) in content_iter.enumerate() {
+                let term_width = term.width() as usize;
+
                 if i == 0 {
                     spinner.finish_and_clear();
                     println!("{ai}");
@@ -100,23 +107,20 @@ pub fn chat(
 
                 response.push_str(&content);
 
-                let text = skin.text(&response, None);
-                let mut new_line_count = text.lines.len();
-
-                for line in text.to_string().lines() {
-                    if line.len() > term_width {
-                        new_line_count += line.len() / term_width;
-                    }
-                }
+                let text = format!("{}", skin.text(&response, Some(term_width)));
 
                 if line_count > 0 {
-                    term.clear_last_lines(line_count)
-                        .expect("Failed to clear lines");
+                    clear_lines(line_count);
                 }
 
-                skin.print_text(&response);
+                println!("{}", text);
 
-                line_count = new_line_count;
+                if response.ends_with("\n\n") {
+                    response.clear();
+                    line_count = 1;
+                } else {
+                    line_count = count_wrapped_lines(&text, term_width);
+                }
             }
 
             term.show_cursor().expect("Failed to show cursor");
@@ -129,4 +133,21 @@ pub fn chat(
             skin.print_text(&response);
         }
     }
+}
+
+fn count_wrapped_lines(rendered: &str, width: usize) -> usize {
+    let plain_text = strip_ansi_codes(rendered);
+
+    let wrapped_lines = wrap(&plain_text, width);
+
+    wrapped_lines.len()
+}
+
+fn clear_lines(num_lines: usize) {
+    let mut out = stdout();
+    for _ in 0..num_lines {
+        write!(out, "\x1B[A").unwrap(); // Move cursor up
+        write!(out, "\x1B[2K").unwrap(); // Clear line
+    }
+    out.flush().unwrap();
 }
