@@ -11,7 +11,7 @@ keywords = ["ai", "assistant", "terminal", "chatbot", "cli"]
 categories = ["command-line-utilities"]
 
 [package.metadata]
-release_date = "2025-02-20"
+release_date = "2025-02-24"
 
 [dependencies]
 aes-gcm = "0.10.3"
