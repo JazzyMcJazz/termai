@@ -3,6 +3,8 @@ use std::io::{BufRead, BufReader};
 use reqwest::blocking::Response;
 use serde::{Deserialize, Serialize};
 
+use crate::provider::Provider;
+
 pub trait Choice {}
 
 #[derive(Debug, Clone, Serialize)]
@@ -93,31 +95,19 @@ pub struct CompletionTokensDetails {
     pub rejected_prediction_tokens: i64,
 }
 
-pub struct ContentIterator {
+pub struct ContentIterator<'a> {
     reader: BufReader<Response>,
+    provider: &'a Provider,
 }
 
-impl ContentIterator {
-    pub fn new(reader: BufReader<Response>) -> Self {
-        Self { reader }
+impl<'a> ContentIterator<'a> {
+    pub fn new(reader: BufReader<Response>, provider: &'a Provider) -> Self {
+        Self { reader, provider }
     }
-}
 
-impl Iterator for ContentIterator {
-    type Item = String;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut line = String::new();
-        // Read the next line from the response.
-        match self.reader.read_line(&mut line) {
-            Ok(0) => None, // End of stream
-            Ok(_) => {
-                // Sometimes the line might be empty or whitespace; skip those.
-                line = line.trim_start_matches("data: ").trim().to_string();
-                if line.is_empty() || line.eq("[DONE]") {
-                    return self.next();
-                }
-                // Parse the line as JSON.
+    fn parse(&self, line: &str) -> Option<String> {
+        match self.provider {
+            Provider::OpenAI(_) => {
                 let res: ChatResponse<StreamChoice> = match serde_json::from_str(&line) {
                     Ok(json) => json,
                     Err(e) => {
@@ -135,6 +125,31 @@ impl Iterator for ContentIterator {
                     }
                     None => Some("".into()),
                 }
+            }
+            Provider::Anthropic(_) => {
+                todo!()
+            }
+        }
+    }
+}
+
+impl Iterator for ContentIterator<'_> {
+    type Item = String;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut line = String::new();
+        // Read the next line from the response.
+        match self.reader.read_line(&mut line) {
+            Ok(0) => None, // End of stream
+            Ok(_) => {
+                // Sometimes the line might be empty or whitespace; skip those.
+                line = line.trim_start_matches("data: ").trim().to_string();
+                if line.is_empty() || line.eq("[DONE]") {
+                    return self.next();
+                }
+
+                // Parse the line as JSON.
+                self.parse(&line)
             }
             Err(e) => Some(format!("\n\nError: {}\n\n", e)),
         }

@@ -7,19 +7,25 @@ use crate::{
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProviderSettings {
+    base_url: String,
     api_key: String,
     model: String,
 }
 
 impl ProviderSettings {
-    pub fn get(&self) -> (String, String) {
-        (self.api_key.clone(), self.model.clone())
+    pub fn get(&self) -> (String, String, String) {
+        (
+            self.base_url.clone(),
+            self.api_key.clone(),
+            self.model.clone(),
+        )
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Provider {
     OpenAI(ProviderSettings),
+    Anthropic(ProviderSettings),
 }
 
 impl Provider {
@@ -28,23 +34,42 @@ impl Provider {
             Some(model) => model,
             None => match provider {
                 ProviderName::OpenAI => "gpt-4o-mini".into(),
+                ProviderName::Anthropic => todo!(),
             },
         };
 
+        let base_url = match provider {
+            ProviderName::OpenAI => "https://api.openai.com/v1/chat/completions".into(),
+            ProviderName::Anthropic => "https://api.anthropic.com/v1/messages".into(),
+        };
+
         match provider {
-            ProviderName::OpenAI => Provider::OpenAI(ProviderSettings { api_key, model }),
+            ProviderName::OpenAI => Provider::OpenAI(ProviderSettings {
+                base_url,
+                api_key,
+                model,
+            }),
+            ProviderName::Anthropic => Provider::Anthropic(ProviderSettings {
+                base_url,
+                api_key,
+                model,
+            }),
         }
     }
 
     pub fn model(&self) -> String {
         match self {
             Provider::OpenAI(settings) => settings.model.clone(),
+            Provider::Anthropic(settings) => settings.model.clone(),
         }
     }
 
     pub fn set_model(&mut self, model: String) {
         match self {
             Provider::OpenAI(settings) => {
+                settings.model = model;
+            }
+            Provider::Anthropic(settings) => {
                 settings.model = model;
             }
         }
@@ -54,7 +79,7 @@ impl Provider {
         Client::chat(messages, self)
     }
 
-    pub fn chat_stream(&self, messages: &[ChatMessage]) -> ContentIterator {
+    pub fn chat_stream<'a>(&'a self, messages: &[ChatMessage]) -> ContentIterator<'a> {
         Client::chat_stream(messages, self)
     }
 
@@ -75,6 +100,9 @@ impl Provider {
             Provider::OpenAI(settings) => {
                 settings.api_key = Enc::encrypt(&settings.api_key)?;
             }
+            Provider::Anthropic(settings) => {
+                settings.api_key = Enc::encrypt(&settings.api_key)?;
+            }
         }
 
         Ok(())
@@ -83,6 +111,9 @@ impl Provider {
     pub fn decrypt(&mut self) -> Result<(), &'static str> {
         match self {
             Provider::OpenAI(settings) => {
+                settings.api_key = Enc::decrypt(&settings.api_key)?;
+            }
+            Provider::Anthropic(settings) => {
                 settings.api_key = Enc::decrypt(&settings.api_key)?;
             }
         }

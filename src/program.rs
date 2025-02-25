@@ -141,6 +141,7 @@ impl Program {
     fn select_model_menu(&mut self, provider: ProviderName) {
         let items = match provider {
             ProviderName::OpenAI => vec!["gpt-4o", "gpt-4o-mini"],
+            ProviderName::Anthropic => todo!(),
         };
 
         let Ok(selection) = Select::new().items(&items).default(0).interact() else {

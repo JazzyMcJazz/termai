@@ -6,6 +6,7 @@ use crate::{provider::Provider, utils::enums::ProviderName};
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
     openai: Option<Provider>,
+    anthropic: Option<Provider>,
     active_provider: Option<ProviderName>,
     #[serde(default)]
     pub use_streaming: bool,
@@ -41,6 +42,7 @@ impl Config {
     pub fn is_configured(&self, provider_name: ProviderName) -> bool {
         match provider_name {
             ProviderName::OpenAI => self.openai.is_some(),
+            ProviderName::Anthropic => self.anthropic.is_some(),
         }
     }
 
@@ -65,11 +67,7 @@ impl Config {
     }
 
     pub fn set_active_provider(&mut self, provider_name: ProviderName) {
-        let exists = match provider_name {
-            ProviderName::OpenAI => self.openai.is_some(),
-        };
-
-        if exists {
+        if self.is_configured(provider_name) {
             self.active_provider = Some(provider_name);
             self.save();
         }
@@ -82,6 +80,11 @@ impl Config {
                     openai.set_model(model);
                 }
             }
+            ProviderName::Anthropic => {
+                if let Some(anthropic) = self.anthropic.as_mut() {
+                    anthropic.set_model(model);
+                }
+            }
         }
 
         self.save();
@@ -90,6 +93,7 @@ impl Config {
     pub fn remove_provider(&mut self, provider_name: ProviderName) {
         match provider_name {
             ProviderName::OpenAI => self.openai = None,
+            ProviderName::Anthropic => self.anthropic = None,
         }
 
         if self.active_provider == Some(provider_name) {
@@ -102,6 +106,7 @@ impl Config {
     pub fn store(&mut self, provider_name: ProviderName, api_key: String) {
         let provider = match provider_name {
             ProviderName::OpenAI => self.openai.as_ref(),
+            ProviderName::Anthropic => self.anthropic.as_ref(),
         };
 
         let model = provider.map(|p| p.model());
@@ -109,6 +114,7 @@ impl Config {
         let provider = Provider::new(provider_name, api_key, model);
         match provider_name {
             ProviderName::OpenAI => self.openai = Some(provider),
+            ProviderName::Anthropic => self.anthropic = Some(provider),
         }
 
         if self.active_provider.is_none() {
