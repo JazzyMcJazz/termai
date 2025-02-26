@@ -87,7 +87,6 @@ pub fn chat(
         messages.push(ChatMessage {
             role: ChatRole::User,
             content: input.trim().into(),
-            refusal: None,
         });
 
         if streaming {
@@ -131,6 +130,7 @@ pub fn chat(
             spinner.finish_and_clear();
             println!("{ai}");
             skin.print_text(&response);
+            println!();
         }
     }
 }

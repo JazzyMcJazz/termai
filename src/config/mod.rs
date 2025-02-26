@@ -1,13 +1,13 @@
 use console::style;
 use serde::{Deserialize, Serialize};
 
+use crate::provider::llm_models;
 use crate::{provider::Provider, utils::enums::ProviderName};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
-    openai: Option<Provider>,
-    anthropic: Option<Provider>,
-    active_provider: Option<ProviderName>,
+    providers: Vec<Provider>,
+    active_provider: Option<usize>,
     #[serde(default)]
     pub use_streaming: bool,
 }
@@ -16,8 +16,8 @@ impl Config {
     pub fn load() -> Self {
         let mut cfg: Config = confy::load("termai", "config").unwrap_or_default();
 
-        if let Some(openai) = cfg.openai.as_mut() {
-            match openai.decrypt() {
+        for provider in cfg.providers.iter_mut() {
+            match provider.decrypt() {
                 Ok(_) => {}
                 Err(e) => {
                     let cross = style("✗").red().bold();
@@ -40,63 +40,75 @@ impl Config {
     }
 
     pub fn is_configured(&self, provider_name: ProviderName) -> bool {
-        match provider_name {
-            ProviderName::OpenAI => self.openai.is_some(),
-            ProviderName::Anthropic => self.anthropic.is_some(),
-        }
+        self.providers.iter().any(|p| p.name() == provider_name)
     }
 
     pub fn active_model(&self) -> Option<String> {
-        match self.active_provider {
-            Some(ProviderName::OpenAI) => self.openai.as_ref().map(|p| p.model()),
-            _ => None,
+        if let Some(model) = self.active_provider().map(|p| p.model()) {
+            let openai_models: &[(&str, &str)] = llm_models::OPENAI_MODELS;
+            let anthropic_models: &[(&str, &str)] = llm_models::ANTHROPIC_MODELS;
+
+            // Find the model in the list of available models
+            let model_name = match self.active_provider()? {
+                Provider::OpenAI(_) => openai_models
+                    .iter()
+                    .find(|(id, _)| id == &model)
+                    .map(|(_, name)| name),
+                Provider::Anthropic(_) => anthropic_models
+                    .iter()
+                    .find(|(id, _)| id == &model)
+                    .map(|(_, name)| name),
+            };
+
+            model_name.map(|name| name.to_string())
+        } else {
+            None
         }
     }
 
-    pub fn active_provider(&self) -> Option<Provider> {
-        match self.active_provider {
-            Some(ProviderName::OpenAI) => self.openai.clone(),
-            _ => None,
-        }
+    pub fn active_provider(&self) -> Option<&Provider> {
+        self.providers.get(self.active_provider?)
     }
 
-    pub fn active_provider_name(&self) -> Option<ProviderName> {
-        // Account for the possibility of a provider being removed
-        self.active_provider
-            .filter(|&active_provider| self.is_configured(active_provider))
-    }
+    pub fn set_model(&mut self, provider_name: ProviderName, model: String) {
+        self.active_provider = self
+            .providers
+            .iter()
+            .position(|p| p.name() == provider_name);
 
-    pub fn set_active_provider(&mut self, provider_name: ProviderName) {
-        if self.is_configured(provider_name) {
-            self.active_provider = Some(provider_name);
+        if let Some(provider) = self.active_provider() {
+            let mut provider = provider.clone();
+            provider.set_model(model);
+            self.providers[self.active_provider.unwrap()] = provider;
             self.save();
         }
     }
 
-    pub fn set_model(&mut self, provider_name: ProviderName, model: String) {
-        match provider_name {
-            ProviderName::OpenAI => {
-                if let Some(openai) = self.openai.as_mut() {
-                    openai.set_model(model);
-                }
-            }
-            ProviderName::Anthropic => {
-                if let Some(anthropic) = self.anthropic.as_mut() {
-                    anthropic.set_model(model);
-                }
+    pub fn fetch_available_models(&self) -> Vec<(ProviderName, String, String)> {
+        let mut models: Vec<(ProviderName, String, String)> = Vec::new();
+
+        for provider in self.providers.iter() {
+            let result = provider.fetch_models();
+            for (id, display_name) in result {
+                models.push((provider.name(), id, display_name));
             }
         }
 
-        self.save();
+        models
     }
 
     pub fn remove_provider(&mut self, provider_name: ProviderName) {
-        match provider_name {
-            ProviderName::OpenAI => self.openai = None,
-            ProviderName::Anthropic => self.anthropic = None,
-        }
+        let provider_index = self
+            .providers
+            .iter()
+            .position(|p| p.name() == provider_name);
 
-        if self.active_provider == Some(provider_name) {
+        self.providers.retain(|p| p.name() != provider_name);
+
+        if self
+            .active_provider
+            .is_some_and(|p| Some(p) == provider_index)
+        {
             self.active_provider = None;
         }
 
@@ -104,21 +116,27 @@ impl Config {
     }
 
     pub fn store(&mut self, provider_name: ProviderName, api_key: String) {
-        let provider = match provider_name {
-            ProviderName::OpenAI => self.openai.as_ref(),
-            ProviderName::Anthropic => self.anthropic.as_ref(),
-        };
+        let provider_index = self
+            .providers
+            .iter()
+            .position(|p| p.name() == provider_name);
 
-        let model = provider.map(|p| p.model());
-
-        let provider = Provider::new(provider_name, api_key, model);
-        match provider_name {
-            ProviderName::OpenAI => self.openai = Some(provider),
-            ProviderName::Anthropic => self.anthropic = Some(provider),
+        if let Some(index) = provider_index {
+            let mut provider = self.providers[index].clone();
+            provider.set_api_key(api_key);
+            self.providers[index] = provider;
+        } else {
+            let provider = Provider::new(provider_name, api_key, None);
+            self.providers.push(provider);
         }
 
-        if self.active_provider.is_none() {
-            self.active_provider = Some(provider_name);
+        let provider_index = self
+            .providers
+            .iter()
+            .position(|p| p.name() == provider_name);
+
+        if self.active_provider().is_none() {
+            self.active_provider = provider_index;
         }
 
         self.save();
@@ -127,8 +145,10 @@ impl Config {
     fn save(&self) {
         let mut cfg = self.clone();
 
-        if let Some(openai) = cfg.openai.as_mut() {
-            match openai.encrypt() {
+        cfg.providers.sort_by_key(|a| a.name());
+
+        for provider in cfg.providers.iter_mut() {
+            match provider.encrypt() {
                 Ok(_) => {}
                 Err(e) => {
                     let cross = style("✗").red().bold();

@@ -55,7 +55,6 @@ pub fn ask(term: &Term, provider: &Provider, mut message: Option<String>) {
     messages.push(ChatMessage {
         role: ChatRole::User,
         content: input.trim().into(),
-        refusal: None,
     });
 
     let response = provider.chat(&messages);

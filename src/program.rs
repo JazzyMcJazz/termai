@@ -57,7 +57,7 @@ impl Program {
     /////////////////////////////
 
     fn main_menu(&mut self) {
-        let items = if self.cfg.active_provider_name().is_some() {
+        let items = if self.cfg.active_provider().is_some() {
             vec!["Chat", "Suggest", "Explain", "Ask", "Options", "Exit"]
         } else {
             vec!["Options", "Exit"]
@@ -79,7 +79,7 @@ impl Program {
     }
 
     fn options_menu(&mut self) {
-        let items = if self.cfg.active_provider_name().is_some() {
+        let items = if self.cfg.active_provider().is_some() {
             let stream_choice = if self.cfg.streaming() {
                 "Disable streaming"
             } else {
@@ -90,7 +90,15 @@ impl Program {
             vec!["Providers", "Changelog"]
         };
 
-        let Ok(selection) = Select::new().items(&items).default(0).interact() else {
+        let prompt =
+            format! {"\n{} {}", style("?").green().bold(), style("What do you want to do?").bold()};
+
+        let Ok(selection) = Select::new()
+            .with_prompt(prompt)
+            .items(&items)
+            .default(0)
+            .interact()
+        else {
             return;
         };
 
@@ -99,7 +107,7 @@ impl Program {
 
         match selected_option {
             "providers" => self.provider_menu(),
-            "change model" => self.select_model_menu(self.cfg.active_provider_name().unwrap()),
+            "change model" => self.select_model_menu(),
             "disable streaming" | "enable streaming (experimental)" => self.cfg.toggle_streaming(),
             "changelog" => changelog::print_latest(),
             _ => unreachable!(),
@@ -107,7 +115,7 @@ impl Program {
     }
 
     fn provider_menu(&mut self) {
-        let items = vec![ProviderName::OpenAI];
+        let items = ProviderName::iter();
         let Ok(selection) = Select::new().items(&items).default(0).interact() else {
             return;
         };
@@ -115,40 +123,55 @@ impl Program {
         self.provider_inner_menu(items[selection]);
     }
 
-    fn provider_inner_menu(&mut self, provider: ProviderName) {
-        let items = if self.cfg.is_configured(provider) {
-            if self.cfg.active_provider_name() == Some(provider) {
-                vec!["Change API Key", "Remove provider"]
-            } else {
-                vec!["Change API Key", "Remove Provider", "Set as active"]
-            }
+    fn provider_inner_menu(&mut self, provider_name: ProviderName) {
+        let items = if self.cfg.is_configured(provider_name) {
+            vec!["Change API Key", "Remove provider"]
         } else {
             vec!["Add API Key"]
         };
 
-        let Ok(selection) = Select::new().items(&items).default(0).interact() else {
+        let prompt =
+            format! {"\n{} {}", style("?").green().bold(), style("What do you want to do?").bold()};
+
+        let Ok(selection) = Select::new()
+            .with_prompt(prompt)
+            .items(&items)
+            .default(0)
+            .interact()
+        else {
             return;
         };
 
         match selection {
-            0 => self.configure_provider(provider),
-            2 => self.cfg.remove_provider(provider),
-            3 => self.cfg.set_active_provider(provider),
+            0 => self.configure_provider(provider_name),
+            1 => self.cfg.remove_provider(provider_name),
             _ => unreachable!(),
         }
     }
 
-    fn select_model_menu(&mut self, provider: ProviderName) {
-        let items = match provider {
-            ProviderName::OpenAI => vec!["gpt-4o", "gpt-4o-mini"],
-            ProviderName::Anthropic => todo!(),
-        };
+    fn select_model_menu(&mut self) {
+        let provider_models = self.cfg.fetch_available_models();
+
+        let items = provider_models
+            .iter()
+            .map(|(provider, _, display_name)| {
+                let spaces: String = (0..18 - display_name.to_string().len())
+                    .map(|_| ' ')
+                    .collect();
+                format!("{}{} {}", display_name, spaces, provider)
+            })
+            .collect::<Vec<String>>();
 
         let Ok(selection) = Select::new().items(&items).default(0).interact() else {
             return;
         };
 
-        self.cfg.set_model(provider, items[selection].into());
+        let Some((provider_name, model, _)) = provider_models.get(selection) else {
+            println!("Invalid selection");
+            return;
+        };
+
+        self.cfg.set_model(*provider_name, model.to_owned());
     }
 
     /////////////////////////////////
@@ -189,10 +212,10 @@ impl Program {
 
         let ai = AI(&self.term);
         match choice {
-            "chat" => ai.chat(&provider, rest_args, self.cfg.streaming()),
-            "suggest" => ai.suggest(&provider, rest_args),
-            "explain" => ai.explain(&provider, rest_args),
-            "ask" => ai.ask(&provider, rest_args),
+            "chat" => ai.chat(provider, rest_args, self.cfg.streaming()),
+            "suggest" => ai.suggest(provider, rest_args),
+            "explain" => ai.explain(provider, rest_args),
+            "ask" => ai.ask(provider, rest_args),
             _ => Program::help(),
         }
     }

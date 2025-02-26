@@ -1,7 +1,8 @@
-mod client;
+mod ai_client;
 mod constants;
 mod models;
+mod traits;
 
-pub use models::{ChatMessage, ChatRole, ContentIterator};
+pub use models::shared::{ChatMessage, ChatRole, ContentIterator};
 
-pub use client::AIClient as Client;
+pub use ai_client::AIClient as Client;
