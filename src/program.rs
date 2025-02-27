@@ -88,8 +88,8 @@ impl Program {
             vec![
                 "Configure Provider",
                 "Change Model",
-                "Changelog",
                 stream_choice,
+                "Changelog",
             ]
         } else {
             vec!["Configure Provider", "Changelog"]
