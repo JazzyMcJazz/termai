@@ -109,7 +109,7 @@ impl Config {
             .active_provider
             .is_some_and(|p| Some(p) == provider_index)
         {
-            self.active_provider = None;
+            self.active_provider = self.providers.first().map(|_| 0);
         }
 
         self.save();
