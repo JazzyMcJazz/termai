@@ -49,7 +49,7 @@ impl Provider {
         };
 
         if model.is_none() {
-            let models = Client::fetch_models(&provider);
+            let models = provider.fetch_models();
             if let Some((model, _)) = models.first() {
                 provider.set_model(model.clone());
             } else {
@@ -128,11 +128,14 @@ impl Provider {
                     .map(|(id, name)| (id.to_string(), name.to_string()))
                     .collect()
             }
-            // No need to filter models for Anthropic since all models are available for all users
-            Provider::Anthropic(_) => llm_models::ANTHROPIC_MODELS
-                .iter()
-                .map(|(id, name)| (id.to_string(), name.to_string()))
-                .collect(),
+            Provider::Anthropic(_) => {
+                let models = Client::fetch_models(self);
+                llm_models::ANTHROPIC_MODELS
+                    .iter()
+                    .filter(|(id, _)| models.iter().any(|(model, _)| model == id))
+                    .map(|(id, name)| (id.to_string(), name.to_string()))
+                    .collect()
+            }
         };
 
         models

@@ -116,7 +116,13 @@ pub struct ErrorObject {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ModelResponse {
-    pub data: Vec<ModelData>,
+    pub data: Option<Vec<ModelData>>,
+    pub error: Option<ModelErrorObject>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ModelErrorObject {
+    pub message: String,
 }
 
 #[allow(dead_code)]
@@ -128,10 +134,13 @@ pub struct ModelData {
 }
 
 impl ModelTrait for ModelResponse {
-    fn extract_models(&self) -> Vec<(String, String)> {
-        self.data
-            .iter()
-            .map(|d| (d.id.clone(), d.id.clone()))
-            .collect()
+    fn extract_models(&self) -> Result<Vec<(String, String)>, String> {
+        if let Some(error) = &self.error {
+            Err(error.message.clone())
+        } else if let Some(data) = &self.data {
+            Ok(data.iter().map(|d| (d.id.clone(), d.id.clone())).collect())
+        } else {
+            Err("No data found".to_string())
+        }
     }
 }

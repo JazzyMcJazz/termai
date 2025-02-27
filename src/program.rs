@@ -85,9 +85,14 @@ impl Program {
             } else {
                 "Enable streaming (experimental)"
             };
-            vec!["Providers", "Change Model", "Changelog", stream_choice]
+            vec![
+                "Configure Provider",
+                "Change Model",
+                "Changelog",
+                stream_choice,
+            ]
         } else {
-            vec!["Providers", "Changelog"]
+            vec!["Configure Provider", "Changelog"]
         };
 
         let prompt =
@@ -106,7 +111,7 @@ impl Program {
         let selected_option = selected_option.as_str();
 
         match selected_option {
-            "providers" => self.provider_menu(),
+            "configure provider" => self.provider_menu(),
             "change model" => self.select_model_menu(),
             "disable streaming" | "enable streaming (experimental)" => self.cfg.toggle_streaming(),
             "changelog" => changelog::print_latest(),
@@ -116,7 +121,15 @@ impl Program {
 
     fn provider_menu(&mut self) {
         let items = ProviderName::iter();
-        let Ok(selection) = Select::new().items(&items).default(0).interact() else {
+
+        let prompt = format! {"\n{} {}", style("?").green().bold(), style("Provider").bold()};
+
+        let Ok(selection) = Select::new()
+            .with_prompt(prompt)
+            .items(&items)
+            .default(0)
+            .interact()
+        else {
             return;
         };
 

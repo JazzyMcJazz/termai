@@ -4,5 +4,5 @@ pub trait ContentTrait {
 }
 
 pub trait ModelTrait {
-    fn extract_models(&self) -> Vec<(String, String)>;
+    fn extract_models(&self) -> Result<Vec<(String, String)>, String>;
 }

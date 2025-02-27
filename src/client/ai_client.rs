@@ -111,9 +111,17 @@ impl AIClient {
     pub fn fetch_models(provider: &Provider) -> Vec<(String, String)> {
         let req = Self::build_models_request(provider);
 
-        match provider {
+        let res = match provider {
             Provider::OpenAI(_) => Self::handle_models_request::<openai::ModelResponse>(req),
             Provider::Anthropic(_) => Self::handle_models_request::<anthropic::ModelResponse>(req),
+        };
+
+        match res {
+            Ok(models) => models,
+            Err(e) => {
+                eprintln!("{} error: {}", provider.name(), e);
+                Vec::new()
+            }
         }
     }
 
@@ -214,18 +222,23 @@ impl AIClient {
 
     fn handle_models_request<T: ModelTrait + DeserializeOwned>(
         req: RequestBuilder,
-    ) -> Vec<(String, String)> {
+    ) -> Result<Vec<(String, String)>, String> {
+        // let res = req.send().expect("Failed to send request");
+        // let text = res.text().expect("Failed to parse response");
+        // dbg!(text);
+
+        // return Ok(Vec::new());
+
         let res: T = match req.send() {
             Ok(res) => match res.json() {
                 Ok(json) => json,
-                Err(e) => {
-                    eprintln!("Failed to parse response: {}", e);
-                    return Vec::new();
+                Err(_) => {
+                    return Err("failed to parse response".to_string());
                 }
             },
             Err(e) => {
                 eprintln!("Failed to send request: {}", e);
-                return Vec::new();
+                return Err("failed to send request".to_string());
             }
         };
 
