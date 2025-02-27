@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Handling of API errors (e.g. insufficient credits or invalid API key)
 
+### Changed
+- Put changelog option at the bottom of the options menu
+
 ### Breaking Changes
 - This update comes with major changes to the config file format, meaning all previously stored configuration can no longer be used. This includes, but is not limited to, API keys configured for any provider.
 
