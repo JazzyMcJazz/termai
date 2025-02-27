@@ -27,9 +27,10 @@ TermAI is packed with features designed to make your command line experience sma
 
 ### Supported Providers
 
-More providers may be added in the future
+- ✅ **OpenAI**
+- ✅ **Anthropic**
 
-✅ **OpenAI**
+*Support for additional provides is not planned at this time, but may be requested.*
 
 #### Obtaining API Keys
 
@@ -41,8 +42,7 @@ To get started with this project, follow the steps below.
 
 ### Requirements
 
-- git
-- the Rust programming language
+- The Rust programming language
 
 #### Linux 
 
@@ -64,7 +64,7 @@ cargo install termai
 
 You can now start using the project. For further instructions, refer to the [usage section](#usage).
 
-To update to the latest version, simply use the same command.
+To update to the latest version, simply use the install command.
 
 # Usage 
 
@@ -96,11 +96,19 @@ You can setup a provider by running `termai` and selecting `Options`. After sett
 
 ### **explain**
 
-*Get a CLI command explained*
+*Get a CLI command explained.*
 
 **Quick access**: `termai explain`
 
 **Quicker access**: `termai explain ls -alF`
+
+### **ask**
+
+*Ask a one-off question. Works like chat, but the program exits immediately after one response.*
+
+**Quick access**: `termai ask`
+
+**Quicker access**: `termai ask hello world`
 
 # Disclaimer
 
