@@ -8,7 +8,7 @@ use termimad::MadSkin;
 use crate::{
     client::{ChatMessage, ChatRole},
     provider::Provider,
-    utils::term_tools::get_spinner_style,
+    utils::console::get_spinner_style,
 };
 
 pub fn ask(term: &Term, provider: &Provider, mut message: Option<String>) {
@@ -39,11 +39,11 @@ pub fn ask(term: &Term, provider: &Provider, mut message: Option<String>) {
         while input.trim().is_empty() {
             term.clear_last_lines(1).expect("Failed to clear last line");
             input.clear();
-            input = rl.readline("").unwrap_or("".into());
+            input = rl.readline("").unwrap_or("q".into());
         }
     }
 
-    if input.trim().is_empty() {
+    if input.trim().eq("q") {
         return;
     }
 
@@ -63,4 +63,6 @@ pub fn ask(term: &Term, provider: &Provider, mut message: Option<String>) {
     println!("{ai}");
     skin.print_text(&response);
     println!();
+
+    std::process::exit(0);
 }

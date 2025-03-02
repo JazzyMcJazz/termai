@@ -5,7 +5,7 @@ use std::env;
 use crate::{
     ai::AI,
     config::Config,
-    utils::{changelog, enums::ProviderName},
+    utils::{changelog, console::get_select_theme, enums::ProviderName},
 };
 
 static VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -41,13 +41,21 @@ impl Program {
         let version_msg = style(format!("version {} ({})", VERSION, RELEASE_DATE)).dim();
         println!("\n{welome_msg}\n{version_msg}");
 
-        let model = program.cfg.active_model().unwrap_or("None".into());
-        let active_model = format!("{} {}", style("Active model:").bold(), style(model).cyan());
+        let model = program
+            .cfg
+            .active_model()
+            .unwrap_or(("".into(), "None".into()));
+        let active_model = format!(
+            "{} {}",
+            style("Active model:").bold(),
+            style(model.1).cyan()
+        );
         println!("\n{active_model}");
 
         if let Some(choice) = choice {
             program.select(&choice.to_owned());
         } else {
+            println!();
             program.main_menu();
         };
     }
@@ -63,107 +71,132 @@ impl Program {
             vec!["Options", "Exit"]
         };
 
-        let prompt =
-            format! {"\n{} {}", style("?").green().bold(), style("What do you want to do?").bold()};
+        let mut selection = 0;
+        loop {
+            let Ok(s) = Select::with_theme(&get_select_theme())
+                .with_prompt("What do you want to do?")
+                .items(&items)
+                .default(selection)
+                .interact()
+            else {
+                std::process::exit(0);
+            };
 
-        let Ok(selection) = Select::new()
-            .with_prompt(prompt)
-            .items(&items)
-            .default(0)
-            .interact()
-        else {
-            return;
-        };
-
-        self.select(&items[selection].to_lowercase());
+            selection = s;
+            self.select(&items[selection].to_lowercase());
+        }
     }
 
     fn options_menu(&mut self) {
-        let items = if self.cfg.active_provider().is_some() {
-            let stream_choice = if self.cfg.streaming() {
-                "Disable streaming"
+        let mut selection = 0;
+        loop {
+            let items = if self.cfg.active_provider().is_some() {
+                let stream_choice = if self.cfg.streaming() {
+                    "Disable streaming"
+                } else {
+                    "Enable streaming (experimental)"
+                };
+                vec![
+                    "Configure Provider",
+                    "Change Model",
+                    stream_choice,
+                    "Changelog",
+                    "Back",
+                ]
             } else {
-                "Enable streaming (experimental)"
+                vec!["Configure Provider", "Changelog", "Back"]
             };
-            vec![
-                "Configure Provider",
-                "Change Model",
-                stream_choice,
-                "Changelog",
-            ]
-        } else {
-            vec!["Configure Provider", "Changelog"]
-        };
 
-        let prompt =
-            format! {"\n{} {}", style("?").green().bold(), style("What do you want to do?").bold()};
+            let _ = self.term.clear_last_lines(1);
+            let Ok(s) = Select::with_theme(&get_select_theme())
+                .with_prompt("Options")
+                .items(&items)
+                .default(selection)
+                .interact()
+            else {
+                std::process::exit(0);
+            };
 
-        let Ok(selection) = Select::new()
-            .with_prompt(prompt)
-            .items(&items)
-            .default(0)
-            .interact()
-        else {
-            return;
-        };
+            selection = s;
+            let selected_option = items[selection].to_lowercase();
+            let selected_option = selected_option.as_str();
 
-        let selected_option = items[selection].to_lowercase();
-        let selected_option = selected_option.as_str();
-
-        match selected_option {
-            "configure provider" => self.provider_menu(),
-            "change model" => self.select_model_menu(),
-            "disable streaming" | "enable streaming (experimental)" => self.cfg.toggle_streaming(),
-            "changelog" => changelog::print_latest(),
-            _ => unreachable!(),
+            match selected_option {
+                "configure provider" => self.provider_menu(),
+                "change model" => self.select_model_menu(),
+                "disable streaming" | "enable streaming (experimental)" => {
+                    self.cfg.toggle_streaming()
+                }
+                "changelog" => {
+                    changelog::print_latest();
+                    std::process::exit(0);
+                }
+                "back" => {
+                    let _ = self.term.clear_last_lines(1);
+                    return;
+                }
+                _ => unreachable!(),
+            }
         }
     }
 
     fn provider_menu(&mut self) {
         let items = ProviderName::iter();
 
-        let prompt = format! {"\n{} {}", style("?").green().bold(), style("Provider").bold()};
-
-        let Ok(selection) = Select::new()
-            .with_prompt(prompt)
+        let _ = self.term.clear_last_lines(1);
+        let Ok(selection) = Select::with_theme(&get_select_theme())
+            .with_prompt("Select provider")
             .items(&items)
             .default(0)
             .interact()
         else {
-            return;
+            std::process::exit(0);
         };
 
         self.provider_inner_menu(items[selection]);
     }
 
     fn provider_inner_menu(&mut self, provider_name: ProviderName) {
-        let items = if self.cfg.is_configured(provider_name) {
-            vec!["Change API Key", "Remove provider"]
+        let is_configured = self.cfg.is_configured(provider_name);
+
+        let items = if is_configured {
+            vec!["Change API Key", "Remove provider", "Back"]
         } else {
-            vec!["Add API Key"]
+            vec!["Add API Key", "Back"]
         };
 
-        let prompt =
-            format! {"\n{} {}", style("?").green().bold(), style("What do you want to do?").bold()};
-
-        let Ok(selection) = Select::new()
-            .with_prompt(prompt)
+        let _ = self.term.clear_last_lines(1);
+        let Ok(selection) = Select::with_theme(&get_select_theme())
+            .with_prompt(provider_name.to_string())
             .items(&items)
             .default(0)
             .interact()
         else {
-            return;
+            std::process::exit(0);
         };
 
         match selection {
             0 => self.configure_provider(provider_name),
-            1 => self.cfg.remove_provider(provider_name),
+            1 => {
+                if is_configured {
+                    self.cfg.remove_provider(provider_name)
+                }
+            }
+            2 => (),
             _ => unreachable!(),
         }
     }
 
     fn select_model_menu(&mut self) {
         let provider_models = self.cfg.fetch_available_models();
+        let active_model = if let Some(model) = self.cfg.active_model() {
+            provider_models
+                .iter()
+                .position(|(_, m, _)| *m == model.0)
+                .unwrap_or(0)
+        } else {
+            0
+        };
 
         let items = provider_models
             .iter()
@@ -175,16 +208,31 @@ impl Program {
             })
             .collect::<Vec<String>>();
 
-        let Ok(selection) = Select::new().items(&items).default(0).interact() else {
-            return;
+        let _ = self.term.clear_last_lines(1);
+        let Ok(selection) = Select::with_theme(&get_select_theme())
+            .with_prompt("Select model")
+            .items(&items)
+            .default(active_model)
+            .interact()
+        else {
+            std::process::exit(0);
         };
 
-        let Some((provider_name, model, _)) = provider_models.get(selection) else {
+        let Some((provider_name, model_id, model_name)) = provider_models.get(selection) else {
             println!("Invalid selection");
             return;
         };
 
-        self.cfg.set_model(*provider_name, model.to_owned());
+        self.cfg.set_model(*provider_name, model_id.to_owned());
+
+        let active_model = format!(
+            "{} {}",
+            style("Active model:").bold(),
+            style(model_name).cyan()
+        );
+
+        let _ = self.term.clear_last_lines(3);
+        println!("{active_model}\n\n");
     }
 
     /////////////////////////////////
@@ -201,7 +249,7 @@ impl Program {
                 changelog::print_latest();
                 return;
             }
-            "exit" => return,
+            "exit" => std::process::exit(0),
             "chat" | "suggest" | "explain" | "ask" => {}
             _ => {
                 Program::help();
@@ -231,6 +279,8 @@ impl Program {
             "ask" => ai.ask(provider, rest_args),
             _ => Program::help(),
         }
+
+        std::process::exit(0);
     }
 
     fn configure_provider(&mut self, provider_name: ProviderName) {

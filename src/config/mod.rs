@@ -43,24 +43,18 @@ impl Config {
         self.providers.iter().any(|p| p.name() == provider_name)
     }
 
-    pub fn active_model(&self) -> Option<String> {
+    pub fn active_model(&self) -> Option<(String, String)> {
         if let Some(model) = self.active_provider().map(|p| p.model()) {
             let openai_models: &[(&str, &str)] = llm_models::OPENAI_MODELS;
             let anthropic_models: &[(&str, &str)] = llm_models::ANTHROPIC_MODELS;
 
             // Find the model in the list of available models
-            let model_name = match self.active_provider()? {
-                Provider::OpenAI(_) => openai_models
-                    .iter()
-                    .find(|(id, _)| id == &model)
-                    .map(|(_, name)| name),
-                Provider::Anthropic(_) => anthropic_models
-                    .iter()
-                    .find(|(id, _)| id == &model)
-                    .map(|(_, name)| name),
+            let model = match self.active_provider()? {
+                Provider::OpenAI(_) => openai_models.iter().find(|(id, _)| id == &model),
+                Provider::Anthropic(_) => anthropic_models.iter().find(|(id, _)| id == &model),
             };
 
-            model_name.map(|name| name.to_string())
+            model.map(|(id, name)| (id.to_string(), name.to_string()))
         } else {
             None
         }

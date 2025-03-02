@@ -12,7 +12,7 @@ use textwrap::wrap;
 use crate::{
     client::{ChatMessage, ChatRole},
     provider::Provider,
-    utils::term_tools::get_spinner_style,
+    utils::console::get_spinner_style,
 };
 
 pub fn chat(
@@ -21,13 +21,7 @@ pub fn chat(
     mut initial_message: Option<String>,
     streaming: bool,
 ) {
-    let exit_words = [
-        "exit".into(),
-        "q".into(),
-        "quit".into(),
-        "goodbye".into(),
-        "thanks".into(),
-    ];
+    let exit_words = ["exit".into(), "q".into(), "quit".into(), "goodbye".into()];
 
     let ai = style("AI:").bold().green();
     let user = style("You:").bold().cyan();
@@ -66,12 +60,8 @@ pub fn chat(
         println!();
 
         if exit_words.contains(&input.trim().to_lowercase()) {
-            if input.trim().to_lowercase() == "thanks" {
-                println!("{ai}\nYou're welcome! 😊\nGoodbye! 👋\n");
-            } else {
-                println!("{ai}\nGoodbye! 👋\n");
-            }
-            return;
+            println!("{ai}\nGoodbye! 👋\n");
+            std::process::exit(0);
         }
 
         if input.trim() == "clear" {

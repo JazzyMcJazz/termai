@@ -64,10 +64,6 @@ impl AIClient {
         let req = Self::build_chat_request(
             &[
                 ChatMessage {
-                    role: ChatRole::System,
-                    content: SUGGEST_SYSTEM_PROMT.into(),
-                },
-                ChatMessage {
                     role: ChatRole::Assistant,
                     content: command_to_revise.into(),
                 },
@@ -76,7 +72,7 @@ impl AIClient {
                     content: query.into(),
                 },
             ],
-            CHAT_SYSTEM_MESSAGE,
+            SUGGEST_SYSTEM_PROMT,
             provider,
             false,
         );

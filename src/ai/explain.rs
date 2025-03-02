@@ -3,10 +3,12 @@ use std::time::Duration;
 use console::style;
 use indicatif::ProgressBar;
 
-use crate::{provider, utils::term_tools::get_spinner_style};
+use crate::{provider, utils::console::get_spinner_style};
 
 pub fn explain(provider: &provider::Provider, query: Option<String>) {
     let query = query.unwrap_or_else(|| {
+        println!();
+
         let prompt = format!{"{} {}", style("?").green().bold(), style("What shell command would you like explained?\n").bold()};
         dialoguer::Input::<String>::new()
             .with_prompt(prompt)

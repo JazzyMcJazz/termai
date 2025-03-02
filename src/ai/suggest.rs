@@ -6,30 +6,33 @@ use indicatif::ProgressBar;
 use crate::{
     ai,
     provider::Provider,
-    utils::{commands::copy_to_clipboard, term_tools::get_spinner_style},
+    utils::{
+        commands::copy_to_clipboard,
+        console::{get_select_theme, get_spinner_style},
+    },
 };
 
 pub fn suggest(provider: &Provider, mut initial_query: Option<String>) {
     let mut last_suggestion = None::<String>;
-    let mut should_exit = false;
 
-    while !should_exit {
-        // Prevent the loop from rerunning if Ctrl+C is pressed
-        should_exit = true;
+    'outer: loop {
+        println!();
 
         let query = initial_query.clone().unwrap_or_else(|| {
-            println!();
             let msg = if last_suggestion.is_some() {
                 "How should this be revised?\n"
             } else {
                 "What would you like the shell command to do?\n"
             };
             let prompt = format! {"{} {}", style("?").green().bold(), style(msg).bold()};
-            dialoguer::Input::<String>::new()
+            let query = dialoguer::Input::<String>::new()
                 .with_prompt(prompt)
                 .allow_empty(false)
                 .interact()
-                .unwrap_or_default()
+                .unwrap_or_default();
+
+            println!();
+            query
         });
 
         initial_query = None;
@@ -38,7 +41,7 @@ pub fn suggest(provider: &Provider, mut initial_query: Option<String>) {
             return;
         }
 
-        println!();
+        // println!();
 
         let spinner = ProgressBar::new_spinner();
         spinner.set_style(get_spinner_style());
@@ -68,23 +71,21 @@ pub fn suggest(provider: &Provider, mut initial_query: Option<String>) {
             "Exit",
         ];
 
-        loop {
-            let prompt =
-                format! {"{} {}", style("?").green().bold(), style("Select an option").bold()};
-            let Ok(selection) = dialoguer::Select::new()
-                .with_prompt(prompt)
+        'inner: loop {
+            let Ok(selection) = dialoguer::Select::with_theme(&get_select_theme())
+                .with_prompt("Select an option")
                 .items(&options)
                 .default(0)
                 .interact()
             else {
-                break;
+                std::process::exit(0);
             };
 
             match selection {
                 0 => {
                     let _ = copy_to_clipboard(&suggested_command)
                         .map_err(|e| eprintln!("{} Error: {}\n", style("✗").red().bold(), e));
-                    return; // Exit
+                    break 'outer; // Exit
                 }
                 1 => {
                     ai::explain(provider, Some(suggested_command.clone()));
@@ -93,18 +94,19 @@ pub fn suggest(provider: &Provider, mut initial_query: Option<String>) {
                 }
                 2 => {
                     last_suggestion = Some(suggested_command.clone());
-                    should_exit = false;
-                    break; // Continue to the next iteration of the outer loop
+                    // let _ = term.clear_last_lines(1);
+                    break 'inner; // Continue to the next iteration of the outer loop
                 }
                 3 => {
                     last_suggestion = None;
-                    should_exit = false;
-                    break; // Continue to the next iteration of the outer loop
+                    break 'inner; // Continue to the next iteration of the outer loop
                 }
                 _ => {
-                    return; // Exit
+                    break 'outer; // Exit
                 }
             }
         }
     }
+
+    std::process::exit(0);
 }
