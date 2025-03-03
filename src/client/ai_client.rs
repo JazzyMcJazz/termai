@@ -4,7 +4,7 @@ use reqwest::blocking::{Client, RequestBuilder};
 use serde::de::DeserializeOwned;
 use serde_json::json;
 
-use crate::provider::Provider;
+use crate::{provider::Provider, utils::shell::detect_shell_environment};
 
 use super::{
     constants::{CHAT_SYSTEM_MESSAGE, EXPLAIN_SYSTEM_PROMT, SUGGEST_SYSTEM_PROMT},
@@ -128,6 +128,13 @@ impl AIClient {
         stream: bool,
     ) -> RequestBuilder {
         let client = Client::new();
+
+        let mut system_message = system_message.to_string();
+
+        if let Some((shell, os)) = detect_shell_environment() {
+            system_message += format!("\n\nActive Shell: {} on {}", shell, os).as_str();
+        }
+
         match provider {
             Provider::OpenAI(settings) => {
                 let (base_url, api_key, model) = settings.get();
@@ -135,7 +142,7 @@ impl AIClient {
 
                 let mut msg = Vec::from([ChatMessage {
                     role: ChatRole::System,
-                    content: system_message.into(),
+                    content: system_message,
                 }]);
 
                 msg.extend(messages.iter().cloned());
