@@ -7,11 +7,16 @@ use termimad::MadSkin;
 
 use crate::{
     client::{ChatMessage, ChatRole},
-    provider::Provider,
+    config::Config,
     utils::console::get_spinner_style,
 };
 
-pub fn ask(term: &Term, provider: &Provider, mut message: Option<String>) {
+pub fn ask(term: &Term, cfg: &Config, mut message: Option<String>) {
+    let provider = cfg.active_provider().unwrap_or_else(|| {
+        eprintln!("No active provider");
+        std::process::exit(1);
+    });
+
     let ai = style("AI:").bold().green();
     let user = style("You:").bold().cyan();
 

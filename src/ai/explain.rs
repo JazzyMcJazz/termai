@@ -3,9 +3,14 @@ use std::time::Duration;
 use console::style;
 use indicatif::ProgressBar;
 
-use crate::{provider, utils::console::get_spinner_style};
+use crate::{config::Config, utils::console::get_spinner_style};
 
-pub fn explain(provider: &provider::Provider, query: Option<String>) {
+pub fn explain(cfg: &Config, query: Option<String>) {
+    let provider = cfg.active_provider().unwrap_or_else(|| {
+        eprintln!("No active provider");
+        std::process::exit(1);
+    });
+
     let query = query.unwrap_or_else(|| {
         println!();
 

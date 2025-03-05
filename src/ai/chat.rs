@@ -11,16 +11,16 @@ use textwrap::wrap;
 
 use crate::{
     client::{ChatMessage, ChatRole},
-    provider::Provider,
+    config::Config,
     utils::console::get_spinner_style,
 };
 
-pub fn chat(
-    term: &Term,
-    provider: &Provider,
-    mut initial_message: Option<String>,
-    streaming: bool,
-) {
+pub fn chat(term: &Term, cfg: &Config, mut initial_message: Option<String>) {
+    let provider = cfg.active_provider().unwrap_or_else(|| {
+        eprintln!("No active provider");
+        std::process::exit(1);
+    });
+
     let exit_words = ["exit".into(), "q".into(), "quit".into(), "goodbye".into()];
 
     let ai = style("AI:").bold().green();
@@ -31,7 +31,9 @@ pub fn chat(
     let mut spinner: ProgressBar;
     let spinner_style = get_spinner_style();
 
+    // In memory message history
     let mut messages = vec![];
+
     if initial_message.is_none() {
         println!("\n{ai}\nWhat can I help with?\n");
     } else {
@@ -79,7 +81,7 @@ pub fn chat(
             content: input.trim().into(),
         });
 
-        if streaming {
+        if cfg.streaming() {
             let mut response = String::new();
             let content_iter = provider.chat_stream(&messages);
             let mut line_count = 0;

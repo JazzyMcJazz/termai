@@ -257,7 +257,8 @@ impl Program {
             }
         }
 
-        let Some(provider) = self.cfg.active_provider() else {
+        // Check if a provider is configured
+        if self.cfg.active_provider().is_none() {
             let cross = style("✗").red().bold();
             let msg = style("You need to configure a provider first").bold();
             println!("{cross} {msg} {cross}", cross = cross, msg = msg);
@@ -271,12 +272,12 @@ impl Program {
             None
         };
 
-        let ai = AI(&self.term);
+        let ai = AI::new(&self.term, &self.cfg);
         match choice {
-            "chat" => ai.chat(provider, rest_args, self.cfg.streaming()),
-            "suggest" => ai.suggest(provider, rest_args),
-            "explain" => ai.explain(provider, rest_args),
-            "ask" => ai.ask(provider, rest_args),
+            "chat" => ai.chat(rest_args),
+            "suggest" => ai.suggest(rest_args),
+            "explain" => ai.explain(rest_args),
+            "ask" => ai.ask(rest_args),
             _ => Program::help(),
         }
 

@@ -5,14 +5,19 @@ use indicatif::ProgressBar;
 
 use crate::{
     ai,
-    provider::Provider,
+    config::Config,
     utils::{
         commands::copy_to_clipboard,
         console::{get_select_theme, get_spinner_style},
     },
 };
 
-pub fn suggest(provider: &Provider, mut initial_query: Option<String>) {
+pub fn suggest(cfg: &Config, mut initial_query: Option<String>) {
+    let provider = cfg.active_provider().unwrap_or_else(|| {
+        eprintln!("No active provider");
+        std::process::exit(1);
+    });
+
     let mut last_suggestion = None::<String>;
 
     'outer: loop {
@@ -88,7 +93,7 @@ pub fn suggest(provider: &Provider, mut initial_query: Option<String>) {
                     break 'outer; // Exit
                 }
                 1 => {
-                    ai::explain(provider, Some(suggested_command.clone()));
+                    ai::explain(cfg, Some(suggested_command.clone()));
                     std::thread::sleep(Duration::from_millis(500));
                     continue; // Continue to the next iteration of the inner loop
                 }
