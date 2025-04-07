@@ -4,6 +4,7 @@ use std::env;
 
 use crate::{
     ai::AI,
+    args::{Args, ChatArgs},
     config::Config,
     utils::{changelog, console::get_select_theme, enums::ProviderName},
 };
@@ -14,7 +15,7 @@ static RELEASE_DATE: &str = env!("RELEASE_DATE");
 pub struct Program {
     term: Term,
     cfg: Config,
-    args: Vec<String>,
+    args: Args,
 }
 
 impl Default for Program {
@@ -22,7 +23,7 @@ impl Default for Program {
         Self {
             term: Term::stdout(),
             cfg: Config::load(),
-            args: env::args().collect(),
+            args: Args::new(VERSION),
         }
     }
 }
@@ -30,12 +31,6 @@ impl Default for Program {
 impl Program {
     pub fn run() {
         let mut program = Program::default();
-        let choice = program.args.get(1);
-
-        if choice == Some(&"--version".to_string()) {
-            println!("TermAI v{} ({})", VERSION, RELEASE_DATE);
-            return;
-        }
 
         let welome_msg = style("Welcome to TermAI - Your AI in the Terminal").bold();
         let version_msg = style(format!("version {} ({})", VERSION, RELEASE_DATE)).dim();
@@ -52,12 +47,10 @@ impl Program {
         );
         println!("\n{active_model}");
 
-        if let Some(choice) = choice {
-            program.select(&choice.to_owned());
-        } else {
-            println!();
-            program.main_menu();
-        };
+        match program.args {
+            Args::None => program.main_menu(),
+            _ => program.handle_args(),
+        }
     }
 
     /////////////////////////////
@@ -66,7 +59,7 @@ impl Program {
 
     fn main_menu(&mut self) {
         let items = if self.cfg.active_provider().is_some() {
-            vec!["Chat", "Suggest", "Explain", "Ask", "Options", "Exit"]
+            vec!["Chat", "Suggest", "Explain", "Options", "Exit"]
         } else {
             vec!["Options", "Exit"]
         };
@@ -83,7 +76,7 @@ impl Program {
             };
 
             selection = s;
-            self.select(&items[selection].to_lowercase());
+            self.select(&items[selection].to_lowercase(), None);
         }
     }
 
@@ -239,7 +232,18 @@ impl Program {
     //           Helpers           //
     /////////////////////////////////
 
-    fn select(&mut self, choice: &str) {
+    fn handle_args(&mut self) {
+        match &self.args {
+            Args::Chat((command, args)) => self.select(command, Some(args.to_owned())),
+            Args::Suggest((command, args)) => self.select(command, Some(args.to_owned())),
+            Args::Explain((command, args)) => self.select(command, Some(args.to_owned())),
+            Args::Options => self.options_menu(),
+            Args::Changelog => changelog::print_latest(),
+            Args::None => unreachable!(),
+        }
+    }
+
+    fn select(&mut self, choice: &str, args: Option<ChatArgs>) {
         match choice {
             "options" => {
                 self.options_menu();
@@ -263,21 +267,20 @@ impl Program {
             let msg = style("You need to configure a provider first").bold();
             println!("{cross} {msg} {cross}", cross = cross, msg = msg);
             println!("  Run `termai options` to configure a provider");
-            return;
+            std::process::exit(1);
         };
 
-        let rest_args = if self.args.len() > 2 {
-            Some(self.args[2..].join(" "))
+        let (prompt, model, search) = if let Some(args) = args {
+            (args.prompt(), args.model(), args.search())
         } else {
-            None
+            (None, false, false)
         };
 
         let ai = AI::new(&self.term, &self.cfg);
         match choice {
-            "chat" => ai.chat(rest_args),
-            "suggest" => ai.suggest(rest_args),
-            "explain" => ai.explain(rest_args),
-            "ask" => ai.ask(rest_args),
+            "chat" => ai.chat(prompt, model, search),
+            "suggest" => ai.suggest(prompt, model),
+            "explain" => ai.explain(prompt, model),
             _ => Program::help(),
         }
 
@@ -302,7 +305,6 @@ impl Program {
         println!("  chat    [ARG]  Chat with the AI (optional string argument)");
         println!("  suggest [ARG]  Get suggestions from the AI (optional string argument)");
         println!("  explain [ARG]  Get explanations from the AI (optional string argument)");
-        println!("  ask     [ARG]  Similar to chat, but the program exits after one response (optional string argument)");
         println!("  options        Configure TermAI");
     }
 }

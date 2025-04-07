@@ -13,7 +13,7 @@ pub fn detect_shell_environment() -> Option<(String, &'static str)> {
     };
 
     if let Ok(shell) = env::var("SHELL") {
-        if let Some(shell) = shell.split('/').last() {
+        if let Some(shell) = shell.split('/').next_back() {
             return Some((shell.into(), os));
         } else {
             return None;

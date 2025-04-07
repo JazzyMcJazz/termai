@@ -1,6 +1,6 @@
 [package]
 name = "termai"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 license = "MIT"
 description = "AI assistant for the terminal"
@@ -11,11 +11,12 @@ keywords = ["ai", "assistant", "terminal", "chatbot", "cli"]
 categories = ["command-line-utilities"]
 
 [package.metadata]
-release_date = "2025-03-03"
+release_date = "2025-04-07"
 
 [dependencies]
 aes-gcm = "0.10.3"
 base64 = "0.22.1"
+clap = "4.5.31"
 confy = "0.6.1"
 console = "0.15.10"
 ctrlc = "3.4.5"

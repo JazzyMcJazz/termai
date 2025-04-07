@@ -6,7 +6,7 @@ fn main() {
         .find(|line| line.starts_with("release_date"))
         .expect("Failed to find release_date in Cargo.toml")
         .split('=')
-        .last()
+        .next_back()
         .expect("Failed to parse release_date in Cargo.toml")
         .trim()
         .trim_matches('"');
