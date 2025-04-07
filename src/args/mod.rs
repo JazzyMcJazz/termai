@@ -74,14 +74,14 @@ impl Args {
 impl ChatArgs {
     pub fn model(&self) -> bool {
         match self.0.subcommand() {
-            Some((_, args)) => args.try_contains_id("model").is_ok() && args.get_flag("model"),
+            Some((_, _args)) => false, // args.try_contains_id("model").is_ok() && args.get_flag("model"),
             None => false,
         }
     }
 
     pub fn search(&self) -> bool {
         match self.0.subcommand() {
-            Some((_, args)) => args.try_contains_id("search").is_ok() && args.get_flag("search"),
+            Some((_, _args)) => false, //args.try_contains_id("search").is_ok() && args.get_flag("search"),
             None => false,
         }
     }
