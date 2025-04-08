@@ -10,16 +10,29 @@ use termimad::MadSkin;
 use textwrap::wrap;
 
 use crate::{
+    ai::utils::{on_the_fly_change_model, NO_MODELS_FOUND_MSG},
     client::{ChatMessage, ChatRole},
     config::Config,
     utils::console::get_spinner_style,
 };
 
-pub fn chat(term: &Term, cfg: &Config, mut initial_message: Option<String>) {
-    let provider = cfg.active_provider().unwrap_or_else(|| {
-        eprintln!("No active provider");
-        std::process::exit(1);
-    });
+pub fn chat(term: &Term, cfg: &Config, mut initial_message: Option<String>, select_model: bool) {
+    let mut provider = cfg
+        .active_provider()
+        .unwrap_or_else(|| {
+            eprintln!("No active provider");
+            std::process::exit(1);
+        })
+        .clone();
+
+    if select_model {
+        println!();
+        if let Some(p) = on_the_fly_change_model(&mut cfg.clone(), Some(provider.model())) {
+            provider = p;
+        } else {
+            println!("{}", style(NO_MODELS_FOUND_MSG).red());
+        }
+    };
 
     let exit_words = ["exit".into(), "q".into(), "quit".into(), "goodbye".into()];
 
@@ -30,6 +43,7 @@ pub fn chat(term: &Term, cfg: &Config, mut initial_message: Option<String>) {
     let skin = MadSkin::default();
     let mut spinner: ProgressBar;
     let spinner_style = get_spinner_style();
+    let mut select_model = false;
 
     // In memory message history
     let mut messages = vec![];
@@ -44,6 +58,16 @@ pub fn chat(term: &Term, cfg: &Config, mut initial_message: Option<String>) {
         spinner = ProgressBar::new_spinner();
         spinner.set_style(spinner_style.clone());
 
+        if select_model {
+            select_model = false;
+            if let Some(p) = on_the_fly_change_model(&mut cfg.clone(), Some(provider.model())) {
+                provider = p;
+                println!();
+            } else {
+                println!("{}", style(NO_MODELS_FOUND_MSG).red());
+            }
+        }
+
         println!("{user}");
 
         let mut input = String::new();
@@ -57,6 +81,12 @@ pub fn chat(term: &Term, cfg: &Config, mut initial_message: Option<String>) {
                 input.clear();
                 input = rl.readline("").unwrap_or("q".into());
             }
+        }
+
+        if input.trim().eq("/model") {
+            select_model = true;
+            println!();
+            continue;
         }
 
         println!();

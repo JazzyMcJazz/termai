@@ -141,7 +141,7 @@ impl AIClient {
                 let url = format!("{base_url}/v1/chat/completions");
 
                 let mut msg = Vec::from([ChatMessage {
-                    role: ChatRole::System,
+                    role: ChatRole::Developer,
                     content: system_message,
                 }]);
 
@@ -226,12 +226,6 @@ impl AIClient {
     fn handle_models_request<T: ModelTrait + DeserializeOwned>(
         req: RequestBuilder,
     ) -> Result<Vec<(String, String)>, String> {
-        // let res = req.send().expect("Failed to send request");
-        // let text = res.text().expect("Failed to parse response");
-        // dbg!(text);
-
-        // return Ok(Vec::new());
-
         let res: T = match req.send() {
             Ok(res) => match res.json() {
                 Ok(json) => json,

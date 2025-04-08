@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.0
+
+### Added
+
+- Support for the gpt-4.5-preview, o1 and o3-mini models.
+- Ability to change models on the fly, either with the --model (-m) flag or by typing `/model` in an active chat.
+   - The model selected using this feature is not saved between sessions.
+   - If you already have configured providers prior to getting this update, you must select a model in the Options menu at least once.
+
+### Changed
+- Optimized system prompts to ensure LLM outputs are formatted correctly.
+
 ## 0.2.3
 
 ### Changed

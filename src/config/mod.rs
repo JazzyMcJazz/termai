@@ -10,6 +10,9 @@ pub struct Config {
     active_provider: Option<usize>,
     #[serde(default)]
     pub use_streaming: bool,
+    ///`(provider_name, model_id, display_name)`
+    #[serde(default)]
+    available_models: Vec<(ProviderName, String, String)>,
 }
 
 impl Config {
@@ -64,6 +67,10 @@ impl Config {
         self.providers.get(self.active_provider?)
     }
 
+    pub fn find_provider(&self, provider_name: &ProviderName) -> Option<&Provider> {
+        self.providers.iter().find(|p| &p.name() == provider_name)
+    }
+
     pub fn set_model(&mut self, provider_name: ProviderName, model: String) {
         self.active_provider = self
             .providers
@@ -78,17 +85,21 @@ impl Config {
         }
     }
 
-    pub fn fetch_available_models(&self) -> Vec<(ProviderName, String, String)> {
-        let mut models: Vec<(ProviderName, String, String)> = Vec::new();
+    pub fn get_available_models(&mut self, fetch: bool) -> Vec<(ProviderName, String, String)> {
+        if fetch {
+            let mut models: Vec<(ProviderName, String, String)> = Vec::new();
 
-        for provider in self.providers.iter() {
-            let result = provider.fetch_models();
-            for (id, display_name) in result {
-                models.push((provider.name(), id, display_name));
+            for provider in self.providers.iter() {
+                let result = provider.fetch_available_models();
+                for (id, display_name) in result {
+                    models.push((provider.name(), id, display_name));
+                }
             }
+
+            self.available_models = models;
         }
 
-        models
+        self.available_models.clone()
     }
 
     pub fn remove_provider(&mut self, provider_name: ProviderName) {
@@ -98,13 +109,16 @@ impl Config {
             .position(|p| p.name() == provider_name);
 
         self.providers.retain(|p| p.name() != provider_name);
+        self.available_models
+            .retain(|(p, _, _)| p != &provider_name);
 
-        if self
-            .active_provider
-            .is_some_and(|p| Some(p) == provider_index)
-        {
-            self.active_provider = self.providers.first().map(|_| 0);
-        }
+        if let Some(index) = self.active_provider {
+            if Some(index) == provider_index {
+                self.active_provider = self.providers.first().map(|_| 0);
+            } else if index > provider_index.unwrap_or(0) {
+                self.active_provider = Some(index - 1);
+            }
+        };
 
         self.save();
     }
@@ -121,6 +135,11 @@ impl Config {
             self.providers[index] = provider;
         } else {
             let provider = Provider::new(provider_name, api_key, None);
+            let models = provider.fetch_available_models();
+            for (id, display_name) in models {
+                self.available_models
+                    .push((provider_name, id, display_name));
+            }
             self.providers.push(provider);
         }
 
@@ -140,6 +159,7 @@ impl Config {
         let mut cfg = self.clone();
 
         cfg.providers.sort_by_key(|a| a.name());
+        cfg.available_models.sort_by_key(|a| a.0);
 
         for provider in cfg.providers.iter_mut() {
             match provider.encrypt() {

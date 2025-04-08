@@ -1,6 +1,7 @@
 mod chat;
 mod explain;
 mod suggest;
+mod utils;
 
 use chat::chat;
 use console::Term;
@@ -19,15 +20,15 @@ impl AI<'_> {
         AI::<'a> { term, cfg }
     }
 
-    pub fn chat(&self, initial_message: Option<String>, _model: bool, _search: bool) {
-        chat(self.term, self.cfg, initial_message);
+    pub fn chat(&self, initial_message: Option<String>, select_model: bool, _search: bool) {
+        chat(self.term, self.cfg, initial_message, select_model);
     }
 
-    pub fn explain(&self, query: Option<String>, _model: bool) {
-        explain(self.cfg, query);
+    pub fn explain(&self, query: Option<String>, select_model: bool) {
+        explain(self.cfg, query, select_model);
     }
 
-    pub fn suggest(&self, query: Option<String>, _model: bool) {
-        suggest(self.cfg, query);
+    pub fn suggest(&self, query: Option<String>, select_model: bool) {
+        suggest(self.cfg, query, select_model);
     }
 }

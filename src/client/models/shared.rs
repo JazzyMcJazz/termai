@@ -9,8 +9,8 @@ use super::{anthropic, openai};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ChatRole {
-    #[serde(rename = "system")]
-    System,
+    #[serde(rename = "developer")]
+    Developer,
     #[serde(rename = "user")]
     User,
     #[serde(rename = "assistant")]

@@ -3,13 +3,29 @@ use std::time::Duration;
 use console::style;
 use indicatif::ProgressBar;
 
-use crate::{config::Config, utils::console::get_spinner_style};
+use crate::{
+    ai::utils::{on_the_fly_change_model, NO_MODELS_FOUND_MSG},
+    config::Config,
+    utils::console::get_spinner_style,
+};
 
-pub fn explain(cfg: &Config, query: Option<String>) {
-    let provider = cfg.active_provider().unwrap_or_else(|| {
-        eprintln!("No active provider");
-        std::process::exit(1);
-    });
+pub fn explain(cfg: &Config, query: Option<String>, select_model: bool) {
+    let mut provider = cfg
+        .active_provider()
+        .unwrap_or_else(|| {
+            eprintln!("No active provider");
+            std::process::exit(1);
+        })
+        .clone();
+
+    if select_model {
+        println!();
+        if let Some(p) = on_the_fly_change_model(&mut cfg.clone(), Some(provider.model())) {
+            provider = p;
+        } else {
+            println!("{}", style(NO_MODELS_FOUND_MSG).red());
+        }
+    };
 
     let query = query.unwrap_or_else(|| {
         println!();

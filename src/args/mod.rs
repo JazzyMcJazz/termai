@@ -1,6 +1,6 @@
 mod subcommand;
 
-use clap::{Arg, ArgMatches, Command};
+use clap::{Arg, ArgAction, ArgMatches, Command};
 use subcommand::SubCommand;
 
 #[derive(Clone)]
@@ -18,11 +18,11 @@ pub struct ChatArgs(ArgMatches);
 
 impl Args {
     pub fn new(version: &'static str) -> Args {
-        // let model_arg = Arg::new("model")
-        //     .short('m')
-        //     .long("model")
-        //     .action(ArgAction::SetTrue)
-        //     .help("Specify the AI model to use");
+        let model_arg = Arg::new("model")
+            .short('m')
+            .long("model")
+            .action(ArgAction::SetTrue)
+            .help("Specify the AI model to use");
 
         // let search_arg = Arg::new("search")
         //     .short('s')
@@ -40,20 +40,22 @@ impl Args {
             .subcommand(
                 Command::new(SubCommand::Chat)
                     .about(SubCommand::Chat.about())
-                    // .arg(model_arg.to_owned())
+                    .arg(model_arg.to_owned().help(
+                        "Specify the AI model to use (You can also use /model in an active chat)",
+                    ))
                     // .arg(search_arg.to_owned())
                     .arg(prompt_arg.to_owned()),
             )
             .subcommand(
                 Command::new(SubCommand::Suggest)
                     .about(SubCommand::Suggest.about())
-                    // .arg(model_arg.to_owned())
+                    .arg(model_arg.to_owned())
                     .arg(prompt_arg.to_owned()),
             )
             .subcommand(
                 Command::new(SubCommand::Explain)
                     .about(SubCommand::Explain.about())
-                    // .arg(model_arg.to_owned())
+                    .arg(model_arg.to_owned())
                     .arg(prompt_arg.to_owned()),
             )
             .subcommand(Command::new(SubCommand::Options).about(SubCommand::Options.about()))
@@ -74,7 +76,13 @@ impl Args {
 impl ChatArgs {
     pub fn model(&self) -> bool {
         match self.0.subcommand() {
-            Some((_, _args)) => false, // args.try_contains_id("model").is_ok() && args.get_flag("model"),
+            Some((_, args)) => {
+                if let Ok(contains_id) = args.try_contains_id("model") {
+                    contains_id && args.get_flag("model")
+                } else {
+                    false
+                }
+            }
             None => false,
         }
     }

@@ -58,6 +58,8 @@ impl Program {
     /////////////////////////////
 
     fn main_menu(&mut self) {
+        println!();
+
         let items = if self.cfg.active_provider().is_some() {
             vec!["Chat", "Suggest", "Explain", "Options", "Exit"]
         } else {
@@ -181,7 +183,7 @@ impl Program {
     }
 
     fn select_model_menu(&mut self) {
-        let provider_models = self.cfg.fetch_available_models();
+        let provider_models = self.cfg.get_available_models(true);
         let active_model = if let Some(model) = self.cfg.active_model() {
             provider_models
                 .iter()
@@ -237,7 +239,11 @@ impl Program {
             Args::Chat((command, args)) => self.select(command, Some(args.to_owned())),
             Args::Suggest((command, args)) => self.select(command, Some(args.to_owned())),
             Args::Explain((command, args)) => self.select(command, Some(args.to_owned())),
-            Args::Options => self.options_menu(),
+            Args::Options => {
+                println!();
+                println!();
+                self.options_menu()
+            }
             Args::Changelog => changelog::print_latest(),
             Args::None => unreachable!(),
         }

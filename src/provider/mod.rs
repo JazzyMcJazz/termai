@@ -49,7 +49,7 @@ impl Provider {
         };
 
         if model.is_none() {
-            let models = provider.fetch_models();
+            let models = provider.fetch_available_models();
             if let Some((model, _)) = models.first() {
                 provider.set_model(model.clone());
             } else {
@@ -117,7 +117,7 @@ impl Provider {
         Client::explain(query, self)
     }
 
-    pub fn fetch_models(&self) -> Vec<(String, String)> {
+    pub fn fetch_available_models(&self) -> Vec<(String, String)> {
         let models = match self {
             Provider::OpenAI(_) => {
                 // Use available models from the API to filter supported models

@@ -4,7 +4,10 @@ use console::style;
 use indicatif::ProgressBar;
 
 use crate::{
-    ai,
+    ai::{
+        self,
+        utils::{on_the_fly_change_model, NO_MODELS_FOUND_MSG},
+    },
     config::Config,
     utils::{
         commands::copy_to_clipboard,
@@ -12,11 +15,23 @@ use crate::{
     },
 };
 
-pub fn suggest(cfg: &Config, mut initial_query: Option<String>) {
-    let provider = cfg.active_provider().unwrap_or_else(|| {
-        eprintln!("No active provider");
-        std::process::exit(1);
-    });
+pub fn suggest(cfg: &Config, mut initial_query: Option<String>, select_model: bool) {
+    let mut provider = cfg
+        .active_provider()
+        .unwrap_or_else(|| {
+            eprintln!("No active provider");
+            std::process::exit(1);
+        })
+        .clone();
+
+    if select_model {
+        println!();
+        if let Some(p) = on_the_fly_change_model(&mut cfg.clone(), Some(provider.model())) {
+            provider = p;
+        } else {
+            println!("{}", style(NO_MODELS_FOUND_MSG).red());
+        }
+    };
 
     let mut last_suggestion = None::<String>;
 
@@ -93,7 +108,7 @@ pub fn suggest(cfg: &Config, mut initial_query: Option<String>) {
                     break 'outer; // Exit
                 }
                 1 => {
-                    ai::explain(cfg, Some(suggested_command.clone()));
+                    ai::explain(cfg, Some(suggested_command.clone()), false);
                     std::thread::sleep(Duration::from_millis(500));
                     continue; // Continue to the next iteration of the inner loop
                 }
