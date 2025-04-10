@@ -1,7 +1,8 @@
+use rig::{message::Message, streaming::StreamingResult};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    client::{ChatMessage, Client, ContentIterator},
+    client::Client,
     utils::{encryption::Enc, enums::ProviderName},
 };
 
@@ -31,7 +32,7 @@ pub enum Provider {
 }
 
 impl Provider {
-    pub fn new(provider_name: ProviderName, api_key: String, model: Option<String>) -> Self {
+    pub async fn new(provider_name: ProviderName, api_key: String, model: Option<String>) -> Self {
         let base_url = match provider_name {
             ProviderName::OpenAI => "https://api.openai.com".into(),
             ProviderName::Anthropic => "https://api.anthropic.com".into(),
@@ -49,7 +50,7 @@ impl Provider {
         };
 
         if model.is_none() {
-            let models = provider.fetch_available_models();
+            let models = provider.fetch_available_models().await;
             if let Some((model, _)) = models.first() {
                 provider.set_model(model.clone());
             } else {
@@ -97,31 +98,31 @@ impl Provider {
         }
     }
 
-    pub fn chat(&self, messages: &[ChatMessage]) -> String {
-        Client::chat(messages, self)
+    pub async fn chat(&self, prompt: &str, messages: Vec<Message>) -> String {
+        Client::chat(prompt, messages, self).await
     }
 
-    pub fn chat_stream<'a>(&'a self, messages: &[ChatMessage]) -> ContentIterator<'a> {
-        Client::chat_stream(messages, self)
+    pub async fn chat_stream(&self, prompt: &str, messages: Vec<Message>) -> StreamingResult {
+        Client::chat_stream(prompt, messages, self).await
     }
 
-    pub fn suggest(&self, query: &str) -> String {
-        Client::suggest(query, self)
+    pub async fn suggest(&self, prompt: &str) -> String {
+        Client::suggest(prompt, self).await
     }
 
-    pub fn revise(&self, command_to_revise: &str, query: &str) -> String {
-        Client::revise(command_to_revise, query, self)
+    pub async fn revise(&self, prompt: &str, command_to_revise: &str) -> String {
+        Client::revise(prompt, command_to_revise, self).await
     }
 
-    pub fn explain(&self, query: &str) -> String {
-        Client::explain(query, self)
+    pub async fn explain(&self, prompt: &str) -> String {
+        Client::explain(prompt, self).await
     }
 
-    pub fn fetch_available_models(&self) -> Vec<(String, String)> {
+    pub async fn fetch_available_models(&self) -> Vec<(String, String)> {
         let models = match self {
             Provider::OpenAI(_) => {
                 // Use available models from the API to filter supported models
-                let models = Client::fetch_models(self);
+                let models = Client::fetch_models(self).await;
                 llm_models::OPENAI_MODELS
                     .iter()
                     .filter(|(id, _)| models.iter().any(|(model, _)| model == id))
@@ -129,7 +130,7 @@ impl Provider {
                     .collect()
             }
             Provider::Anthropic(_) => {
-                let models = Client::fetch_models(self);
+                let models = Client::fetch_models(self).await;
                 llm_models::ANTHROPIC_MODELS
                     .iter()
                     .filter(|(id, _)| models.iter().any(|(model, _)| model == id))

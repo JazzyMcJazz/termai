@@ -9,7 +9,7 @@ use crate::{
     utils::console::get_spinner_style,
 };
 
-pub fn explain(cfg: &Config, query: Option<String>, select_model: bool) {
+pub async fn explain(cfg: &Config, query: Option<String>, select_model: bool) {
     let mut provider = cfg
         .active_provider()
         .unwrap_or_else(|| {
@@ -20,7 +20,7 @@ pub fn explain(cfg: &Config, query: Option<String>, select_model: bool) {
 
     if select_model {
         println!();
-        if let Some(p) = on_the_fly_change_model(&mut cfg.clone(), Some(provider.model())) {
+        if let Some(p) = on_the_fly_change_model(&mut cfg.clone(), Some(provider.model())).await {
             provider = p;
         } else {
             println!("{}", style(NO_MODELS_FOUND_MSG).red());
@@ -48,7 +48,7 @@ pub fn explain(cfg: &Config, query: Option<String>, select_model: bool) {
     spinner.enable_steady_tick(Duration::from_millis(100));
     spinner.set_message(style("Thinking...").dim().bold().to_string());
 
-    let explanation = provider.explain(&query);
+    let explanation = provider.explain(&query).await;
     let explanation = explanation.replace(r"\x1b", "\x1b"); // Fix ANSI escape codes
 
     spinner.finish_and_clear();

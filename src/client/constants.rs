@@ -1,4 +1,4 @@
-pub const CHAT_SYSTEM_MESSAGE: &str = r#"
+pub const CHAT_PREAMBLE: &str = r#"
 **You are a conversational AI designed for use in a command-line interface (CLI).**
 
 ### **Formatting Rules:**
@@ -28,7 +28,7 @@ pub const CHAT_SYSTEM_MESSAGE: &str = r#"
 Stay precise, informative, and structured for CLI readability.
 "#;
 
-pub const SUGGEST_SYSTEM_PROMT: &str = r#"
+pub const SUGGEST_PREAMBLE: &str = r#"
 You are an AI designed to suggest shell commands.
 
 <behavior_guidelines>
@@ -50,7 +50,7 @@ You are an AI designed to suggest shell commands.
 </example_interactions>
 "#;
 
-pub const EXPLAIN_SYSTEM_PROMT: &str = r#"
+pub const EXPLAIN_PREAMBLE: &str = r#"
 You are an AI designed to explain shell commands.
  
 \033[0mFormatting Rules\033[0m

@@ -20,15 +20,15 @@ impl AI<'_> {
         AI::<'a> { term, cfg }
     }
 
-    pub fn chat(&self, initial_message: Option<String>, select_model: bool, _search: bool) {
-        chat(self.term, self.cfg, initial_message, select_model);
+    pub async fn chat(&self, initial_message: Option<String>, select_model: bool, _search: bool) {
+        chat(self.term, self.cfg, initial_message, select_model).await;
     }
 
-    pub fn explain(&self, query: Option<String>, select_model: bool) {
-        explain(self.cfg, query, select_model);
+    pub async fn explain(&self, query: Option<String>, select_model: bool) {
+        explain(self.cfg, query, select_model).await;
     }
 
-    pub fn suggest(&self, query: Option<String>, select_model: bool) {
-        suggest(self.cfg, query, select_model);
+    pub async fn suggest(&self, query: Option<String>, select_model: bool) {
+        suggest(self.cfg, query, select_model).await;
     }
 }

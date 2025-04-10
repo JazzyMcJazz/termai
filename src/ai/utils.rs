@@ -5,11 +5,12 @@ use crate::{config::Config, provider::Provider, utils::console::get_select_theme
 pub const NO_MODELS_FOUND_MSG: &str =
     "Unable to change model. Select a model in the Options menu to fix this issue.";
 
-pub fn on_the_fly_change_model(
+pub async fn on_the_fly_change_model(
     cfg: &mut Config,
     active_model_id: Option<String>,
 ) -> Option<Provider> {
-    let models = cfg.get_available_models(false);
+    let models = cfg.get_available_models();
+
     let active_model = if let Some(model) = active_model_id {
         models.iter().position(|(_, m, _)| *m == model).unwrap_or(0)
     } else if let Some(model) = cfg.active_model() {

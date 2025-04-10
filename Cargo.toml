@@ -1,6 +1,6 @@
 [package]
 name = "termai"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 license = "MIT"
 description = "AI assistant for the terminal"
@@ -11,30 +11,32 @@ keywords = ["ai", "assistant", "terminal", "chatbot", "cli"]
 categories = ["command-line-utilities"]
 
 [package.metadata]
-release_date = "2025-04-08"
+release_date = "2025-04-10"
 
 [dependencies]
 aes-gcm = "0.10.3"
 base64 = "0.22.1"
-clap = "4.5.31"
+clap = "4.5.35"
 confy = "0.6.1"
-console = "0.15.10"
-ctrlc = "3.4.5"
+console = "0.15.11"
+ctrlc = "3.4.6"
 dialoguer = "0.11.0"
+futures = "0.3.31"
 hex = "0.4.3"
 indicatif = "0.17.11"
+keyring = { version = "3.6.2", features = ["sync-secret-service", "apple-native", "windows-native"] }
 rand = "0.9.0"
-reqwest = { version = "0.12.12", features = ["blocking", "json"] }
+reqwest = { version = "0.12.15", features = ["json"] }
+rig-core = "0.11.0"
+# rmcp = { version = "0.1.5", features = ["client", "transport-child-process"] }
+# rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk", branch = "main", features = ["client", "transport-child-process"] }
 rustyline = "15.0.0"
-serde = "1.0.217"
-serde_json = "1.0.138"
+serde = "1.0.219"
+serde_json = "1.0.140"
 sysinfo = "0.34.2"
 termimad = "0.31.2"
-textwrap = "0.16.1"
-
-[dependencies.keyring]
-version = "3.6.1"
-features = ["sync-secret-service", "apple-native", "windows-native"]
+textwrap = "0.16.2"
+tokio = { version = "1.44.2", features = ["full"] }
 
 [profile.release]
 opt-level = "z"

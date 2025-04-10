@@ -1,115 +1,77 @@
-use std::io::BufReader;
-
-use reqwest::blocking::{Client, RequestBuilder};
+use reqwest::{Client, RequestBuilder};
+use rig::{
+    completion::Chat,
+    message::Message,
+    streaming::{StreamingChat, StreamingResult},
+};
 use serde::de::DeserializeOwned;
-use serde_json::json;
 
 use crate::{provider::Provider, utils::shell::detect_shell_environment};
 
 use super::{
-    constants::{CHAT_SYSTEM_MESSAGE, EXPLAIN_SYSTEM_PROMT, SUGGEST_SYSTEM_PROMT},
-    models::{
-        anthropic, openai,
-        shared::{ChatMessage, ChatRole, ContentIterator},
-    },
-    traits::{ContentTrait, ModelTrait},
+    constants::{CHAT_PREAMBLE, EXPLAIN_PREAMBLE, SUGGEST_PREAMBLE},
+    models::{anthropic, openai},
+    traits::ModelTrait,
 };
 
 pub struct AIClient;
 
 impl AIClient {
-    pub fn chat(messages: &[ChatMessage], provider: &Provider) -> String {
-        let req = Self::build_chat_request(messages, CHAT_SYSTEM_MESSAGE, provider, false);
+    pub async fn chat_stream(
+        prompt: &str,
+        messages: Vec<Message>,
+        provider: &Provider,
+    ) -> StreamingResult {
+        let stream = match provider {
+            Provider::Anthropic(settings) => {
+                let (_, api_key, model) = settings.get();
 
-        match provider {
-            Provider::OpenAI(_) => {
-                Self::handle_chat_request::<openai::ChatResponse<openai::AggregateChoice>>(req)
+                let client = rig::providers::anthropic::ClientBuilder::new(&api_key).build();
+
+                let agent = client.agent(&model).preamble(CHAT_PREAMBLE).build();
+
+                agent.stream_chat(prompt, messages).await.unwrap()
             }
-            Provider::Anthropic(_) => Self::handle_chat_request::<anthropic::ChatResponse>(req),
-        }
-    }
+            Provider::OpenAI(settings) => {
+                let (_, api_key, model) = settings.get();
 
-    pub fn chat_stream<'a>(
-        messages: &[ChatMessage],
-        provider: &'a Provider,
-    ) -> ContentIterator<'a> {
-        let req = Self::build_chat_request(messages, CHAT_SYSTEM_MESSAGE, provider, true);
+                let agent = rig::providers::openai::Client::new(&api_key)
+                    .agent(&model)
+                    .preamble(CHAT_PREAMBLE)
+                    .build();
 
-        let res = req.send().expect("Failed to send request");
-
-        let reader = BufReader::new(res);
-        ContentIterator::new(reader, provider)
-    }
-
-    pub fn suggest(query: &str, provider: &Provider) -> String {
-        let req = Self::build_chat_request(
-            &[ChatMessage {
-                role: ChatRole::User,
-                content: query.into(),
-            }],
-            SUGGEST_SYSTEM_PROMT,
-            provider,
-            false,
-        );
-
-        match provider {
-            Provider::OpenAI(_) => {
-                Self::handle_chat_request::<openai::ChatResponse<openai::AggregateChoice>>(req)
+                agent.stream_chat(prompt, messages).await.unwrap()
             }
-            Provider::Anthropic(_) => Self::handle_chat_request::<anthropic::ChatResponse>(req),
-        }
+        };
+
+        stream
     }
 
-    pub fn revise(command_to_revise: &str, query: &str, provider: &Provider) -> String {
-        let req = Self::build_chat_request(
-            &[
-                ChatMessage {
-                    role: ChatRole::Assistant,
-                    content: command_to_revise.into(),
-                },
-                ChatMessage {
-                    role: ChatRole::User,
-                    content: query.into(),
-                },
-            ],
-            SUGGEST_SYSTEM_PROMT,
-            provider,
-            false,
-        );
-
-        match provider {
-            Provider::OpenAI(_) => {
-                Self::handle_chat_request::<openai::ChatResponse<openai::AggregateChoice>>(req)
-            }
-            Provider::Anthropic(_) => Self::handle_chat_request::<anthropic::ChatResponse>(req),
-        }
+    pub async fn chat(prompt: &str, messages: Vec<Message>, provider: &Provider) -> String {
+        Self::chat_completion(prompt, CHAT_PREAMBLE, messages, provider).await
     }
 
-    pub fn explain(command: &str, provider: &Provider) -> String {
-        let req = Self::build_chat_request(
-            &[ChatMessage {
-                role: ChatRole::User,
-                content: command.into(),
-            }],
-            EXPLAIN_SYSTEM_PROMT,
-            provider,
-            false,
-        );
-
-        match provider {
-            Provider::OpenAI(_) => {
-                Self::handle_chat_request::<openai::ChatResponse<openai::AggregateChoice>>(req)
-            }
-            Provider::Anthropic(_) => Self::handle_chat_request::<anthropic::ChatResponse>(req),
-        }
+    pub async fn suggest(prompt: &str, provider: &Provider) -> String {
+        Self::chat_completion(prompt, SUGGEST_PREAMBLE, vec![], provider).await
     }
 
-    pub fn fetch_models(provider: &Provider) -> Vec<(String, String)> {
+    pub async fn revise(prompt: &str, command_to_revise: &str, provider: &Provider) -> String {
+        let messages = vec![Message::assistant(command_to_revise)];
+        Self::chat_completion(prompt, SUGGEST_PREAMBLE, messages, provider).await
+    }
+
+    pub async fn explain(prompt: &str, provider: &Provider) -> String {
+        Self::chat_completion(prompt, EXPLAIN_PREAMBLE, vec![], provider).await
+    }
+
+    pub async fn fetch_models(provider: &Provider) -> Vec<(String, String)> {
         let req = Self::build_models_request(provider);
 
         let res = match provider {
-            Provider::OpenAI(_) => Self::handle_models_request::<openai::ModelResponse>(req),
-            Provider::Anthropic(_) => Self::handle_models_request::<anthropic::ModelResponse>(req),
+            Provider::OpenAI(_) => Self::handle_models_request::<openai::ModelResponse>(req).await,
+            Provider::Anthropic(_) => {
+                Self::handle_models_request::<anthropic::ModelResponse>(req).await
+            }
         };
 
         match res {
@@ -121,80 +83,38 @@ impl AIClient {
         }
     }
 
-    fn build_chat_request(
-        messages: &[ChatMessage],
-        system_message: &str,
+    async fn chat_completion(
+        prompt: &str,
+        preamble: &str,
+        messages: Vec<Message>,
         provider: &Provider,
-        stream: bool,
-    ) -> RequestBuilder {
-        let client = Client::new();
-
-        let mut system_message = system_message.to_string();
+    ) -> String {
+        let mut preamble = preamble.to_string();
 
         if let Some((shell, os)) = detect_shell_environment() {
-            system_message += format!("\n\nActive Shell: {} on {}", shell, os).as_str();
+            preamble += format!("\n\nActive Shell: {} on {}", shell, os).as_str();
         }
 
         match provider {
-            Provider::OpenAI(settings) => {
-                let (base_url, api_key, model) = settings.get();
-                let url = format!("{base_url}/v1/chat/completions");
-
-                let mut msg = Vec::from([ChatMessage {
-                    role: ChatRole::Developer,
-                    content: system_message,
-                }]);
-
-                msg.extend(messages.iter().cloned());
-
-                client
-                    .post(url)
-                    .header("Content-Type", "application/json")
-                    .bearer_auth(api_key)
-                    .json(&json!({
-                        "stream": stream,
-                        "model": model,
-                        "messages": msg,
-                    }))
-            }
             Provider::Anthropic(settings) => {
-                let (base_url, api_key, model) = settings.get();
-                let url = format!("{base_url}/v1/messages");
+                let (_, api_key, model) = settings.get();
 
-                client
-                    .post(url)
-                    .header("x-api-key", api_key)
-                    .header("anthropic-version", "2023-06-01")
-                    .header("content-type", "application/json")
-                    .json(&json!({
-                        "max_tokens": 4096,
-                        "stream": stream,
-                        "model": model,
-                        "system": system_message,
-                        "messages": messages,
-                    }))
+                let client = rig::providers::anthropic::ClientBuilder::new(&api_key).build();
+
+                let agent = client.agent(&model).preamble(&preamble).build();
+
+                agent.chat(prompt, messages).await.unwrap()
             }
-        }
-    }
+            Provider::OpenAI(settings) => {
+                let (_, api_key, model) = settings.get();
 
-    fn handle_chat_request<T: ContentTrait + DeserializeOwned>(req: RequestBuilder) -> String {
-        let res: T = match req.send() {
-            Ok(res) => match res.json() {
-                Ok(json) => json,
-                Err(e) => {
-                    return format!("Failed to parse response: {}", e);
-                }
-            },
-            Err(e) => {
-                return format!("Failed to send request: {}", e);
+                let agent = rig::providers::openai::Client::new(&api_key)
+                    .agent(&model)
+                    .preamble(&preamble)
+                    .build();
+
+                agent.chat(prompt, messages).await.unwrap()
             }
-        };
-
-        if let Some(content) = res.extract_content() {
-            content
-        } else {
-            eprintln!("No response from server");
-            String::new()
         }
     }
 
@@ -223,11 +143,11 @@ impl AIClient {
         }
     }
 
-    fn handle_models_request<T: ModelTrait + DeserializeOwned>(
+    async fn handle_models_request<T: ModelTrait + DeserializeOwned>(
         req: RequestBuilder,
     ) -> Result<Vec<(String, String)>, String> {
-        let res: T = match req.send() {
-            Ok(res) => match res.json() {
+        let res: T = match req.send().await {
+            Ok(res) => match res.json().await {
                 Ok(json) => json,
                 Err(_) => {
                     return Err("failed to parse response".to_string());
@@ -242,3 +162,13 @@ impl AIClient {
         res.extract_models()
     }
 }
+
+// async fn get_tools() -> Option<Vec<rmcp::model::Tool>> {
+//     let command = "deno";
+//     let args = vec!["-A", "/home/lr/Development/mcp-playground/server/main.ts", "--stdio"];
+//     let client = crate::mcp::McpClient::new(command, args).await;
+//     let tools = client.tools().await;
+//     client.cancel().await;
+
+//     tools
+// }

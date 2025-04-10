@@ -29,7 +29,7 @@ impl Default for Program {
 }
 
 impl Program {
-    pub fn run() {
+    pub async fn run() {
         let mut program = Program::default();
 
         let welome_msg = style("Welcome to TermAI - Your AI in the Terminal").bold();
@@ -48,8 +48,8 @@ impl Program {
         println!("\n{active_model}");
 
         match program.args {
-            Args::None => program.main_menu(),
-            _ => program.handle_args(),
+            Args::None => program.main_menu().await,
+            _ => program.handle_args().await,
         }
     }
 
@@ -57,7 +57,7 @@ impl Program {
     //          Menus          //
     /////////////////////////////
 
-    fn main_menu(&mut self) {
+    async fn main_menu(&mut self) {
         println!();
 
         let items = if self.cfg.active_provider().is_some() {
@@ -78,11 +78,11 @@ impl Program {
             };
 
             selection = s;
-            self.select(&items[selection].to_lowercase(), None);
+            self.select(&items[selection].to_lowercase(), None).await;
         }
     }
 
-    fn options_menu(&mut self) {
+    async fn options_menu(&mut self) {
         let mut selection = 0;
         loop {
             let items = if self.cfg.active_provider().is_some() {
@@ -117,8 +117,8 @@ impl Program {
             let selected_option = selected_option.as_str();
 
             match selected_option {
-                "configure provider" => self.provider_menu(),
-                "change model" => self.select_model_menu(),
+                "configure provider" => self.provider_menu().await,
+                "change model" => self.select_model_menu().await,
                 "disable streaming" | "enable streaming (experimental)" => {
                     self.cfg.toggle_streaming()
                 }
@@ -135,7 +135,7 @@ impl Program {
         }
     }
 
-    fn provider_menu(&mut self) {
+    async fn provider_menu(&mut self) {
         let items = ProviderName::iter();
 
         let _ = self.term.clear_last_lines(1);
@@ -148,10 +148,10 @@ impl Program {
             std::process::exit(0);
         };
 
-        self.provider_inner_menu(items[selection]);
+        self.provider_inner_menu(items[selection]).await;
     }
 
-    fn provider_inner_menu(&mut self, provider_name: ProviderName) {
+    async fn provider_inner_menu(&mut self, provider_name: ProviderName) {
         let is_configured = self.cfg.is_configured(provider_name);
 
         let items = if is_configured {
@@ -171,7 +171,7 @@ impl Program {
         };
 
         match selection {
-            0 => self.configure_provider(provider_name),
+            0 => self.configure_provider(provider_name).await,
             1 => {
                 if is_configured {
                     self.cfg.remove_provider(provider_name)
@@ -182,8 +182,10 @@ impl Program {
         }
     }
 
-    fn select_model_menu(&mut self) {
-        let provider_models = self.cfg.get_available_models(true);
+    async fn select_model_menu(&mut self) {
+        self.cfg.refresh_available_models().await;
+        let provider_models = self.cfg.get_available_models().to_owned();
+
         let active_model = if let Some(model) = self.cfg.active_model() {
             provider_models
                 .iter()
@@ -234,25 +236,25 @@ impl Program {
     //           Helpers           //
     /////////////////////////////////
 
-    fn handle_args(&mut self) {
+    async fn handle_args(&mut self) {
         match &self.args {
-            Args::Chat((command, args)) => self.select(command, Some(args.to_owned())),
-            Args::Suggest((command, args)) => self.select(command, Some(args.to_owned())),
-            Args::Explain((command, args)) => self.select(command, Some(args.to_owned())),
+            Args::Chat((command, args)) => self.select(command, Some(args.to_owned())).await,
+            Args::Suggest((command, args)) => self.select(command, Some(args.to_owned())).await,
+            Args::Explain((command, args)) => self.select(command, Some(args.to_owned())).await,
             Args::Options => {
                 println!();
                 println!();
-                self.options_menu()
+                self.options_menu().await
             }
             Args::Changelog => changelog::print_latest(),
             Args::None => unreachable!(),
         }
     }
 
-    fn select(&mut self, choice: &str, args: Option<ChatArgs>) {
+    async fn select(&mut self, choice: &str, args: Option<ChatArgs>) {
         match choice {
             "options" => {
-                self.options_menu();
+                self.options_menu().await;
                 return;
             }
             "changelog" => {
@@ -284,16 +286,16 @@ impl Program {
 
         let ai = AI::new(&self.term, &self.cfg);
         match choice {
-            "chat" => ai.chat(prompt, model, search),
-            "suggest" => ai.suggest(prompt, model),
-            "explain" => ai.explain(prompt, model),
+            "chat" => ai.chat(prompt, model, search).await,
+            "suggest" => ai.suggest(prompt, model).await,
+            "explain" => ai.explain(prompt, model).await,
             _ => Program::help(),
         }
 
         std::process::exit(0);
     }
 
-    fn configure_provider(&mut self, provider_name: ProviderName) {
+    async fn configure_provider(&mut self, provider_name: ProviderName) {
         let Ok(api_key) = dialoguer::Password::new()
             .with_prompt(format!("Enter your {:?} API key", provider_name))
             .allow_empty_password(false)
@@ -302,7 +304,7 @@ impl Program {
             return;
         };
 
-        self.cfg.store(provider_name, api_key);
+        self.cfg.store(provider_name, api_key).await;
     }
 
     fn help() {

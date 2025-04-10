@@ -15,7 +15,7 @@ use crate::{
     },
 };
 
-pub fn suggest(cfg: &Config, mut initial_query: Option<String>, select_model: bool) {
+pub async fn suggest(cfg: &Config, mut initial_query: Option<String>, select_model: bool) {
     let mut provider = cfg
         .active_provider()
         .unwrap_or_else(|| {
@@ -26,7 +26,7 @@ pub fn suggest(cfg: &Config, mut initial_query: Option<String>, select_model: bo
 
     if select_model {
         println!();
-        if let Some(p) = on_the_fly_change_model(&mut cfg.clone(), Some(provider.model())) {
+        if let Some(p) = on_the_fly_change_model(&mut cfg.clone(), Some(provider.model())).await {
             provider = p;
         } else {
             println!("{}", style(NO_MODELS_FOUND_MSG).red());
@@ -69,9 +69,9 @@ pub fn suggest(cfg: &Config, mut initial_query: Option<String>, select_model: bo
         spinner.set_message(style("Thinking...").dim().bold().to_string());
 
         let suggested_command = if let Some(last_suggestion) = last_suggestion.clone() {
-            provider.revise(&last_suggestion, &query)
+            provider.revise(&query, &last_suggestion).await
         } else {
-            provider.suggest(&query).clone()
+            provider.suggest(&query).await.clone()
         };
 
         spinner.finish_and_clear();
@@ -108,7 +108,7 @@ pub fn suggest(cfg: &Config, mut initial_query: Option<String>, select_model: bo
                     break 'outer; // Exit
                 }
                 1 => {
-                    ai::explain(cfg, Some(suggested_command.clone()), false);
+                    ai::explain(cfg, Some(suggested_command.clone()), false).await;
                     std::thread::sleep(Duration::from_millis(500));
                     continue; // Continue to the next iteration of the inner loop
                 }

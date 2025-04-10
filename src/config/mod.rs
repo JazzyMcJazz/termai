@@ -1,8 +1,10 @@
 use console::style;
 use serde::{Deserialize, Serialize};
 
-use crate::provider::llm_models;
-use crate::{provider::Provider, utils::enums::ProviderName};
+use crate::{
+    provider::{llm_models, Provider},
+    utils::enums::ProviderName,
+};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
@@ -85,21 +87,30 @@ impl Config {
         }
     }
 
-    pub fn get_available_models(&mut self, fetch: bool) -> Vec<(ProviderName, String, String)> {
-        if fetch {
-            let mut models: Vec<(ProviderName, String, String)> = Vec::new();
+    pub async fn refresh_available_models(&mut self) {
+        let mut models: Vec<(ProviderName, String, String)> = Vec::new();
 
-            for provider in self.providers.iter() {
-                let result = provider.fetch_available_models();
-                for (id, display_name) in result {
-                    models.push((provider.name(), id, display_name));
-                }
-            }
+        let mut tasks = vec![];
 
-            self.available_models = models;
+        for provider in self.providers.iter() {
+            let task = provider.fetch_available_models();
+            tasks.push(task);
         }
 
-        self.available_models.clone()
+        let results = futures::future::join_all(tasks).await;
+
+        for (i, result) in results.into_iter().enumerate() {
+            let provider = &self.providers[i];
+            for (id, display_name) in result {
+                models.push((provider.name(), id, display_name));
+            }
+        }
+
+        self.available_models = models;
+    }
+
+    pub fn get_available_models(&self) -> &Vec<(ProviderName, String, String)> {
+        &self.available_models
     }
 
     pub fn remove_provider(&mut self, provider_name: ProviderName) {
@@ -123,7 +134,7 @@ impl Config {
         self.save();
     }
 
-    pub fn store(&mut self, provider_name: ProviderName, api_key: String) {
+    pub async fn store(&mut self, provider_name: ProviderName, api_key: String) {
         let provider_index = self
             .providers
             .iter()
@@ -134,8 +145,8 @@ impl Config {
             provider.set_api_key(api_key);
             self.providers[index] = provider;
         } else {
-            let provider = Provider::new(provider_name, api_key, None);
-            let models = provider.fetch_available_models();
+            let provider = Provider::new(provider_name, api_key, None).await;
+            let models = provider.fetch_available_models().await;
             for (id, display_name) in models {
                 self.available_models
                     .push((provider_name, id, display_name));
