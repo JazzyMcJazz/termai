@@ -6,20 +6,21 @@ use std::{
 use console::{strip_ansi_codes, style, Term};
 use futures::StreamExt;
 use indicatif::{ProgressBar, TermLike};
-use rig::{message::Message, streaming::StreamingChoice};
+use rig::message::Message;
 use rustyline::DefaultEditor;
 use termimad::MadSkin;
 use textwrap::wrap;
 
 use crate::{
     ai::utils::{on_the_fly_change_model, NO_MODELS_FOUND_MSG},
+    client::StreamingContent,
     config::Config,
     utils::console::get_spinner_style,
 };
 
 pub async fn chat(
     term: &Term,
-    cfg: &Config,
+    cfg: &mut Config,
     mut initial_message: Option<String>,
     select_model: bool,
 ) {
@@ -119,23 +120,36 @@ pub async fn chat(
             let mut response = String::new();
             let mut final_response = String::new();
 
-            let mut stream = provider.chat_stream(&input, messages.clone()).await;
+            let mut stream = provider
+                .chat_stream(&input, messages.clone(), cfg.mcp_clients())
+                .await;
 
             let mut line_count = 0;
 
-            term.hide_cursor().expect("Failed to hide cursor");
+            let _ = term.hide_cursor();
 
             let mut clear = true;
-            while let Some(chunk) = stream.next().await {
-                let Ok(choice) = chunk else {
-                    continue;
+            while let Some(content) = stream.next().await {
+                let content = match content {
+                    Ok(content) => content,
+                    Err(e) => StreamingContent::Text(e.to_string()),
                 };
 
-                let content = match choice {
-                    StreamingChoice::Message(content) => content,
-                    StreamingChoice::ToolCall(name, bob, params) => {
-                        let tool = format!("Tool: {name} - {bob} - {params}");
-                        println!("{tool}");
+                let content = match content {
+                    StreamingContent::Text(text) => text,
+                    StreamingContent::PauseSpinner => {
+                        spinner.disable_steady_tick();
+                        continue;
+                    }
+                    StreamingContent::StartSpinner => {
+                        let _ = term.clear_last_lines(2);
+                        if spinner.is_finished() {
+                            spinner = ProgressBar::new_spinner();
+                            spinner.set_style(spinner_style.clone());
+                        }
+                        spinner.enable_steady_tick(Duration::from_millis(100));
+                        let _ = term.hide_cursor(); // confirmation prompt shows cursor after interaction
+                        clear = true;
                         continue;
                     }
                 };
@@ -170,10 +184,16 @@ pub async fn chat(
             messages.push(Message::user(&input));
             messages.push(Message::assistant(final_response));
 
-            term.show_cursor().expect("Failed to show cursor");
-            term.flush().expect("Failed to flush terminal");
+            let _ = term.show_cursor();
+            let _ = term.flush();
         } else {
-            let response = provider.chat(&input, messages.clone()).await;
+            let response = match provider
+                .chat(&input, messages.clone(), cfg.mcp_clients(), &spinner)
+                .await
+            {
+                Ok(response) => response,
+                Err(e) => e.to_string(),
+            };
 
             spinner.finish_and_clear();
             println!("{ai}");
@@ -197,8 +217,8 @@ fn count_wrapped_lines(rendered: &str, width: usize) -> usize {
 fn clear_lines(num_lines: usize) {
     let mut out = stdout();
     for _ in 0..num_lines {
-        write!(out, "\x1B[A").unwrap(); // Move cursor up
-        write!(out, "\x1B[2K").unwrap(); // Clear line
+        let _ = write!(out, "\x1B[A"); // Move cursor up
+        let _ = write!(out, "\x1B[2K"); // Clear line
     }
-    out.flush().unwrap();
+    let _ = out.flush();
 }

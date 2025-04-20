@@ -12,15 +12,20 @@ use crate::config::Config;
 
 pub struct AI<'a> {
     term: &'a Term,
-    cfg: &'a Config,
+    cfg: &'a mut Config,
 }
 
 impl AI<'_> {
-    pub fn new<'a>(term: &'a Term, cfg: &'a Config) -> AI<'a> {
+    pub fn new<'a>(term: &'a Term, cfg: &'a mut Config) -> AI<'a> {
         AI::<'a> { term, cfg }
     }
 
-    pub async fn chat(&self, initial_message: Option<String>, select_model: bool, _search: bool) {
+    pub async fn chat(
+        &mut self,
+        initial_message: Option<String>,
+        select_model: bool,
+        _search: bool,
+    ) {
         chat(self.term, self.cfg, initial_message, select_model).await;
     }
 

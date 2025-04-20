@@ -48,8 +48,10 @@ pub async fn explain(cfg: &Config, query: Option<String>, select_model: bool) {
     spinner.enable_steady_tick(Duration::from_millis(100));
     spinner.set_message(style("Thinking...").dim().bold().to_string());
 
-    let explanation = provider.explain(&query).await;
-    let explanation = explanation.replace(r"\x1b", "\x1b"); // Fix ANSI escape codes
+    let explanation = match provider.explain(&query).await {
+        Ok(result) => result.replace(r"\x1b", "\x1b"), // Fix ANSI escape codes
+        Err(e) => e.to_string(),
+    };
 
     spinner.finish_and_clear();
 

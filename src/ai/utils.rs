@@ -25,7 +25,7 @@ pub async fn on_the_fly_change_model(
     let items = models
         .iter()
         .map(|(provider, _, display_name)| {
-            let spaces: String = (0..18 - display_name.to_string().len())
+            let spaces: String = (0..26 - display_name.to_string().len())
                 .map(|_| ' ')
                 .collect();
             format!("{}{} {}", display_name, spaces, provider)

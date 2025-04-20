@@ -1,8 +1,10 @@
-use rig::{message::Message, streaming::StreamingResult};
+use indicatif::ProgressBar;
+use rig::{completion::PromptError, message::Message};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    client::Client,
+    client::{Client, StreamingContentResult},
+    mcp::McpClient,
     utils::{encryption::Enc, enums::ProviderName},
 };
 
@@ -98,23 +100,38 @@ impl Provider {
         }
     }
 
-    pub async fn chat(&self, prompt: &str, messages: Vec<Message>) -> String {
-        Client::chat(prompt, messages, self).await
+    pub async fn chat(
+        &self,
+        prompt: &str,
+        messages: Vec<Message>,
+        mcp_clients: &mut Vec<McpClient>,
+        spinner: &ProgressBar,
+    ) -> Result<String, PromptError> {
+        Client::chat(prompt, messages, self, mcp_clients, spinner).await
     }
 
-    pub async fn chat_stream(&self, prompt: &str, messages: Vec<Message>) -> StreamingResult {
-        Client::chat_stream(prompt, messages, self).await
+    pub async fn chat_stream(
+        &self,
+        prompt: &str,
+        messages: Vec<Message>,
+        mcp_clients: &mut Vec<McpClient>,
+    ) -> StreamingContentResult {
+        Client::chat_stream(prompt, messages, self, mcp_clients).await
     }
 
-    pub async fn suggest(&self, prompt: &str) -> String {
+    pub async fn suggest(&self, prompt: &str) -> Result<String, PromptError> {
         Client::suggest(prompt, self).await
     }
 
-    pub async fn revise(&self, prompt: &str, command_to_revise: &str) -> String {
+    pub async fn revise(
+        &self,
+        prompt: &str,
+        command_to_revise: &str,
+    ) -> Result<String, PromptError> {
         Client::revise(prompt, command_to_revise, self).await
     }
 
-    pub async fn explain(&self, prompt: &str) -> String {
+    pub async fn explain(&self, prompt: &str) -> Result<String, PromptError> {
         Client::explain(prompt, self).await
     }
 

@@ -1,15 +1,20 @@
 use console::{style, Term};
-use dialoguer::Select;
-use std::env;
+use dialoguer::{MultiSelect, Select};
+use std::{env, time::Duration};
 
 use crate::{
     ai::AI,
     args::{Args, ChatArgs},
     config::Config,
-    utils::{changelog, console::get_select_theme, enums::ProviderName},
+    mcp::{McpClient, McpClientConfig},
+    utils::{
+        changelog,
+        console::{get_select_theme, get_spinner_style},
+        enums::ProviderName,
+    },
 };
 
-static VERSION: &str = env!("CARGO_PKG_VERSION");
+pub static VERSION: &str = env!("CARGO_PKG_VERSION");
 static RELEASE_DATE: &str = env!("RELEASE_DATE");
 
 pub struct Program {
@@ -78,7 +83,8 @@ impl Program {
             };
 
             selection = s;
-            self.select(&items[selection].to_lowercase(), None).await;
+            self.handle_main_menu_choice(&items[selection].to_lowercase(), None)
+                .await;
         }
     }
 
@@ -95,6 +101,7 @@ impl Program {
                     "Configure Provider",
                     "Change Model",
                     stream_choice,
+                    "Model Context Protocol (MCP)",
                     "Changelog",
                     "Back",
                 ]
@@ -122,6 +129,7 @@ impl Program {
                 "disable streaming" | "enable streaming (experimental)" => {
                     self.cfg.toggle_streaming()
                 }
+                "model context protocol (mcp)" => self.mcp_menu().await,
                 "changelog" => {
                     changelog::print_latest();
                     std::process::exit(0);
@@ -198,7 +206,7 @@ impl Program {
         let items = provider_models
             .iter()
             .map(|(provider, _, display_name)| {
-                let spaces: String = (0..18 - display_name.to_string().len())
+                let spaces: String = (0..26 - display_name.to_string().len())
                     .map(|_| ' ')
                     .collect();
                 format!("{}{} {}", display_name, spaces, provider)
@@ -232,15 +240,51 @@ impl Program {
         println!("{active_model}\n\n");
     }
 
+    async fn mcp_menu(&mut self) {
+        let mut selection = 0;
+        loop {
+            let items = vec![
+                "Configure new MCP server",
+                "Enable/disable MCP servers",
+                "Remove MCP server",
+                "Back",
+            ];
+
+            let _ = self.term.clear_last_lines(1);
+            selection = Select::with_theme(&get_select_theme())
+                .with_prompt("Model Context Protocol (MCP)")
+                .items(&items)
+                .default(selection)
+                .interact()
+                .unwrap_or_else(|_| std::process::exit(0));
+
+            match selection {
+                0 => self.prompt_mcp_options().await,
+                1 => self.select_enabled_mcp_servers(),
+                2 => self.remove_mcp_client().await,
+                _ => break,
+            }
+        }
+    }
+
     /////////////////////////////////
     //           Helpers           //
     /////////////////////////////////
 
     async fn handle_args(&mut self) {
         match &self.args {
-            Args::Chat((command, args)) => self.select(command, Some(args.to_owned())).await,
-            Args::Suggest((command, args)) => self.select(command, Some(args.to_owned())).await,
-            Args::Explain((command, args)) => self.select(command, Some(args.to_owned())).await,
+            Args::Chat((command, args)) => {
+                self.handle_main_menu_choice(command, Some(args.to_owned()))
+                    .await
+            }
+            Args::Suggest((command, args)) => {
+                self.handle_main_menu_choice(command, Some(args.to_owned()))
+                    .await
+            }
+            Args::Explain((command, args)) => {
+                self.handle_main_menu_choice(command, Some(args.to_owned()))
+                    .await
+            }
             Args::Options => {
                 println!();
                 println!();
@@ -251,7 +295,7 @@ impl Program {
         }
     }
 
-    async fn select(&mut self, choice: &str, args: Option<ChatArgs>) {
+    async fn handle_main_menu_choice(&mut self, choice: &str, args: Option<ChatArgs>) {
         match choice {
             "options" => {
                 self.options_menu().await;
@@ -284,7 +328,7 @@ impl Program {
             (None, false, false)
         };
 
-        let ai = AI::new(&self.term, &self.cfg);
+        let mut ai = AI::new(&self.term, &mut self.cfg);
         match choice {
             "chat" => ai.chat(prompt, model, search).await,
             "suggest" => ai.suggest(prompt, model).await,
@@ -304,7 +348,188 @@ impl Program {
             return;
         };
 
-        self.cfg.store(provider_name, api_key).await;
+        self.cfg.add_provider_api_key(provider_name, api_key).await;
+    }
+
+    async fn prompt_mcp_options(&mut self) {
+        let selection = dialoguer::Select::with_theme(&get_select_theme())
+            .with_prompt("Select connection type".to_string())
+            .default(0)
+            .items(&["Program", "SSE", "Cancel"])
+            .clear(true)
+            .interact()
+            .unwrap_or_else(|_| std::process::exit(0));
+
+        if selection == 2 {
+            let _ = self.term.clear_last_lines(1);
+            return;
+        }
+
+        let is_sse = selection == 1;
+
+        let command_or_url_prompt = if is_sse { "URL" } else { "Command" };
+
+        let command_or_url_prompt = format!(
+            "{} {}",
+            style("›").green(),
+            style(command_or_url_prompt).bold()
+        );
+
+        let command_or_url = dialoguer::Input::<String>::new()
+            .with_prompt(style(command_or_url_prompt).bold().to_string())
+            .allow_empty(false)
+            .interact()
+            .unwrap_or_else(|_| std::process::exit(0));
+
+        let args = if is_sse {
+            None
+        } else {
+            let prompt = format!("{} {}", style("›").green(), style("Arguments").bold());
+            Some(
+                dialoguer::Input::<String>::new()
+                    .with_prompt(style(prompt).bold().to_string())
+                    .allow_empty(true)
+                    .interact()
+                    .unwrap_or_else(|_| std::process::exit(0))
+                    .split_whitespace()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>(),
+            )
+        };
+
+        let mut client: McpClient = match args {
+            Some(args) => {
+                McpClientConfig::StdIo(String::new(), String::new(), command_or_url, args, false)
+            }
+            None => McpClientConfig::Sse(String::new(), String::new(), command_or_url, false),
+        }
+        .into();
+
+        println!();
+        let message = format!(
+            "{} {}",
+            style("⏳").bold(),
+            style("Testing connection...").bold()
+        );
+        let spinner = indicatif::ProgressBar::new_spinner();
+        spinner.set_style(get_spinner_style());
+        spinner.set_message(message.to_string());
+        spinner.enable_steady_tick(Duration::from_millis(100));
+
+        tokio::time::sleep(Duration::from_millis(1000)).await;
+
+        enum McpInit {
+            Succes,
+            Failure,
+            Duplicate,
+        }
+
+        // Test the connection
+        let mut result = match client.initialize().await {
+            Ok(_) => McpInit::Succes,
+            Err(_) => McpInit::Failure,
+        };
+
+        if self
+            .cfg
+            .mcp_clients()
+            .iter()
+            .filter(|c| c.name() == client.name())
+            .count()
+            > 0
+        {
+            result = McpInit::Duplicate;
+        }
+
+        spinner.finish_and_clear();
+        self.term.clear_last_lines(1).unwrap_or(());
+
+        // deno -A /home/lr/Development/mcp-playground/server/main.ts --stdio
+
+        let message = match result {
+            McpInit::Succes => {
+                self.cfg.add_mcp_client(client);
+                format!(
+                    "{} {}",
+                    style("✔").green(),
+                    style("Connection successful. Configuration saved.").bold()
+                )
+            }
+            McpInit::Duplicate => {
+                format!(
+                    "{} {} {}",
+                    style("✗").red(),
+                    style(client.name()).bold().italic(),
+                    style("is already configured.").bold(),
+                )
+            }
+            McpInit::Failure => {
+                format!(
+                    "{} {}",
+                    style("✗").red(),
+                    style("Connection failed.").bold()
+                )
+            }
+        };
+
+        println!("{message}\n\n");
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+
+    fn select_enabled_mcp_servers(&mut self) {
+        let clients = self.cfg.mcp_clients_mut();
+
+        let items = clients
+            .iter()
+            .map(|client| format!("{} ({})", client.name(), client.version()))
+            .collect::<Vec<String>>();
+
+        let defaults = clients
+            .iter()
+            .map(|client| client.is_enabled())
+            .collect::<Vec<bool>>();
+
+        let _ = self.term.clear_last_lines(1);
+        let Ok(selections) = MultiSelect::with_theme(&get_select_theme())
+            .with_prompt("Select MCP server (press Enter to confirm)")
+            .items(&items[..])
+            .defaults(&defaults[..])
+            .interact()
+        else {
+            std::process::exit(0);
+        };
+
+        for (i, client) in clients.iter_mut().enumerate() {
+            client.set_enabled(selections.contains(&i));
+        }
+
+        self.cfg.save();
+    }
+
+    async fn remove_mcp_client(&mut self) {
+        let clients = self.cfg.mcp_clients_mut();
+
+        let mut items = clients
+            .iter()
+            .map(|client| format!("{} ({})", client.name(), client.version()))
+            .collect::<Vec<String>>();
+
+        items.push("Cancel".to_string());
+
+        let _ = self.term.clear_last_lines(1);
+        let selection = Select::with_theme(&get_select_theme())
+            .with_prompt("Select MCP server to remove")
+            .items(&items[..])
+            .default(0)
+            .interact()
+            .unwrap_or_else(|_| std::process::exit(0));
+
+        if selection == items.len() - 1 {
+            return;
+        }
+
+        clients.remove(selection);
+        self.cfg.save();
     }
 
     fn help() {

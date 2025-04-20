@@ -2,19 +2,22 @@ use console::style;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    mcp::McpClient,
     provider::{llm_models, Provider},
     utils::enums::ProviderName,
 };
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Config {
     providers: Vec<Provider>,
     active_provider: Option<usize>,
     #[serde(default)]
     pub use_streaming: bool,
-    ///`(provider_name, model_id, display_name)`
+    /// **provider_name, model_id, display_name**
     #[serde(default)]
     available_models: Vec<(ProviderName, String, String)>,
+    #[serde(default)]
+    mcp_clients: Vec<McpClient>,
 }
 
 impl Config {
@@ -134,7 +137,7 @@ impl Config {
         self.save();
     }
 
-    pub async fn store(&mut self, provider_name: ProviderName, api_key: String) {
+    pub async fn add_provider_api_key(&mut self, provider_name: ProviderName, api_key: String) {
         let provider_index = self
             .providers
             .iter()
@@ -166,7 +169,20 @@ impl Config {
         self.save();
     }
 
-    fn save(&self) {
+    pub fn mcp_clients(&mut self) -> &mut Vec<McpClient> {
+        &mut self.mcp_clients
+    }
+
+    pub fn mcp_clients_mut(&mut self) -> &mut Vec<McpClient> {
+        &mut self.mcp_clients
+    }
+
+    pub fn add_mcp_client(&mut self, mcp_client: McpClient) {
+        self.mcp_clients.push(mcp_client);
+        self.save();
+    }
+
+    pub fn save(&self) {
         let mut cfg = self.clone();
 
         cfg.providers.sort_by_key(|a| a.name());

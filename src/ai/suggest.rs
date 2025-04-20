@@ -68,10 +68,19 @@ pub async fn suggest(cfg: &Config, mut initial_query: Option<String>, select_mod
         spinner.enable_steady_tick(Duration::from_millis(100));
         spinner.set_message(style("Thinking...").dim().bold().to_string());
 
-        let suggested_command = if let Some(last_suggestion) = last_suggestion.clone() {
+        let result = if let Some(last_suggestion) = last_suggestion.to_owned() {
             provider.revise(&query, &last_suggestion).await
         } else {
-            provider.suggest(&query).await.clone()
+            provider.suggest(&query).await
+        };
+
+        let suggested_command = match result {
+            Ok(command) => command,
+            Err(e) => {
+                spinner.finish_and_clear();
+                eprintln!("{} {}\n", style("✗").red(), e);
+                std::process::exit(1);
+            }
         };
 
         spinner.finish_and_clear();

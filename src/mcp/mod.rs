@@ -1,39 +1,226 @@
-use rmcp::{model::Tool, serve_client, service::RunningService, transport::TokioChildProcess, RoleClient};
-use tokio::process::Command;
+use anyhow::Result;
+use mcp_core::{
+    client::{Client, ClientBuilder},
+    transport::{ClientSseTransport, ClientSseTransportBuilder, ClientStdioTransport, Transport},
+    types::{ClientCapabilities, Implementation, InitializeResponse, RootCapabilities, Tool},
+};
+use rig::{agent::AgentBuilder, completion::CompletionModel};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 
+use crate::program::VERSION;
 
-pub struct McpClient {
-    client: RunningService<RoleClient, ()>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientStdioInfo {
+    pub name: String,
+    pub version: String,
+    pub program: String,
+    pub args: Vec<String>,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientSseInfo {
+    pub name: String,
+    pub version: String,
+    pub url: String,
+    pub enabled: bool,
+}
+
+#[derive(Clone)]
+pub enum McpClient {
+    /// Server name, client, command, arguments, enabled
+    StdIo(Client<ClientStdioTransport>, ClientStdioInfo),
+    /// Server name, client, url, enabled
+    Sse(Client<ClientSseTransport>, ClientSseInfo),
 }
 
 impl McpClient {
-    pub async fn new(command: &str, args: Vec<&str>) -> Self {
-        let client= serve_client(
-            (),
-            TokioChildProcess::new(Command::new(command).args(args)).unwrap(),
-        )
-        .await.unwrap(); 
-
-        McpClient {
-            client,
+    pub fn set_enabled(&mut self, enabled: bool) {
+        match self {
+            McpClient::StdIo(_, info) => info.enabled = enabled,
+            McpClient::Sse(_, info) => info.enabled = enabled,
         }
     }
 
-    pub async fn tools(&self) -> Option<Vec<Tool>> {
-        if self.client.peer_info().capabilities.tools.is_none() {
-            return None;
+    pub fn is_enabled(&self) -> bool {
+        match self {
+            McpClient::StdIo(_, info) => info.enabled,
+            McpClient::Sse(_, info) => info.enabled,
+        }
+    }
+
+    pub fn name(&self) -> String {
+        match self {
+            McpClient::StdIo(_, info) => info.name.clone(),
+            McpClient::Sse(_, info) => info.name.clone(),
+        }
+    }
+
+    pub fn version(&self) -> String {
+        match self {
+            McpClient::StdIo(_, info) => info.version.clone(),
+            McpClient::Sse(_, info) => info.version.clone(),
+        }
+    }
+
+    pub async fn initialize(&mut self) -> Result<()> {
+        match self {
+            McpClient::StdIo(client, info) => {
+                if client.assert_initialized().await.is_err() {
+                    let res = Self::initialize_inner(client).await?;
+                    info.name = res.server_info.name;
+                    info.version = res.server_info.version;
+                }
+            }
+            McpClient::Sse(client, info) => {
+                if client.assert_initialized().await.is_err() {
+                    let res = Self::initialize_inner(client).await?;
+                    info.name = res.server_info.name;
+                    info.version = res.server_info.version;
+                }
+            }
         }
 
-        match self.client.list_all_tools().await {
-            Ok(tools) => Some(tools),
-            Err(e) => {
-                eprintln!("Error listing tools: {}", e);
-                None
+        Ok(())
+    }
+
+    pub async fn add_tools<M: CompletionModel>(
+        &self,
+        agent_builder: AgentBuilder<M>,
+    ) -> AgentBuilder<M> {
+        let tools = self.tools().await;
+
+        match self {
+            McpClient::StdIo(client, _) => {
+                tools.into_iter().fold(agent_builder, |builder, tool| {
+                    builder.mcp_tool(tool, client.clone())
+                })
+            }
+            McpClient::Sse(client, _) => tools.into_iter().fold(agent_builder, |builder, tool| {
+                builder.mcp_tool(tool, client.clone())
+            }),
+        }
+    }
+
+    async fn initialize_inner<T: Transport>(client: &Client<T>) -> Result<InitializeResponse> {
+        client.open().await?;
+
+        let res = client
+            .initialize(
+                Implementation {
+                    name: "termai-mcp-client".to_string(),
+                    version: VERSION.to_string(),
+                },
+                ClientCapabilities {
+                    experimental: Some(json!({})),
+                    roots: Some(RootCapabilities {
+                        list_changed: Some(false),
+                    }),
+                    sampling: Some(json!({})),
+                },
+            )
+            .await?;
+
+        Ok(res)
+    }
+
+    async fn tools(&self) -> Vec<Tool> {
+        match self {
+            McpClient::StdIo(client, _) => match client.list_tools(None, None).await {
+                Ok(tools) => tools.tools,
+                Err(e) => {
+                    eprintln!("Error listing tools: {}", e);
+                    vec![]
+                }
+            },
+            McpClient::Sse(client, _) => match client.list_tools(None, None).await {
+                Ok(tools) => tools.tools,
+                Err(e) => {
+                    eprintln!("Error listing tools: {}", e);
+                    vec![]
+                }
+            },
+        }
+    }
+}
+
+impl From<McpClientConfig> for McpClient {
+    fn from(config: McpClientConfig) -> Self {
+        match config {
+            McpClientConfig::StdIo(name, version, program, args, enabled) => {
+                let program_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+                let transport = ClientStdioTransport::new(&program, &program_args)
+                    .expect("Failed to create transport");
+                let client = ClientBuilder::new(transport).build();
+                McpClient::StdIo(
+                    client,
+                    ClientStdioInfo {
+                        name,
+                        version,
+                        program,
+                        args,
+                        enabled,
+                    },
+                )
+            }
+            McpClientConfig::Sse(name, version, url, enabled) => {
+                let transport = ClientSseTransportBuilder::new(url.clone()).build();
+                let client = ClientBuilder::new(transport).build();
+                McpClient::Sse(
+                    client,
+                    ClientSseInfo {
+                        name,
+                        version,
+                        url,
+                        enabled,
+                    },
+                )
             }
         }
     }
+}
 
-    pub async fn cancel(self) {
-        let _ = self.client.cancel().await;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum McpClientConfig {
+    StdIo(String, String, String, Vec<String>, bool), // Name, Version, Program, Arguments, Enabled
+    Sse(String, String, String, bool),                // Name, Version, URL, Enabled
+}
+
+impl From<McpClient> for McpClientConfig {
+    fn from(client: McpClient) -> Self {
+        match client {
+            McpClient::StdIo(_, info) => McpClientConfig::StdIo(
+                info.name,
+                info.version,
+                info.program,
+                info.args,
+                info.enabled,
+            ),
+            McpClient::Sse(_, info) => {
+                McpClientConfig::Sse(info.name, info.version, info.url, info.enabled)
+            }
+        }
+    }
+}
+
+impl Serialize for McpClient {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let config: McpClientConfig = self.clone().into();
+        config.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for McpClient {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let config = McpClientConfig::deserialize(deserializer)?;
+        let client = McpClient::from(config);
+        Ok(client)
     }
 }
