@@ -9,7 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Model Context Protocol (MCP) client implementation.
+- Model Context Protocol (MCP) client implementation. Currently only tools are supported.
+- Slash commands with tab completion (chat mode only). Type **/help** to see available commands.
+
+### Changed
+
+- Changing model, either with the **--model** flag or the **/model** slash command, is now a permanent action.
 
 ## 0.4.1
 

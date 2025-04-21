@@ -7,11 +7,7 @@ use crate::{
     args::{Args, ChatArgs},
     config::Config,
     mcp::{McpClient, McpClientConfig},
-    utils::{
-        changelog,
-        console::{get_select_theme, get_spinner_style},
-        enums::ProviderName,
-    },
+    utils::{changelog, console::get_select_theme, enums::ProviderName},
 };
 
 pub static VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -245,7 +241,7 @@ impl Program {
         loop {
             let items = vec![
                 "Configure new MCP server",
-                "Enable/disable MCP servers",
+                "Enable / disable MCP servers",
                 "Remove MCP server",
                 "Back",
             ];
@@ -405,19 +401,6 @@ impl Program {
         }
         .into();
 
-        println!();
-        let message = format!(
-            "{} {}",
-            style("⏳").bold(),
-            style("Testing connection...").bold()
-        );
-        let spinner = indicatif::ProgressBar::new_spinner();
-        spinner.set_style(get_spinner_style());
-        spinner.set_message(message.to_string());
-        spinner.enable_steady_tick(Duration::from_millis(100));
-
-        tokio::time::sleep(Duration::from_millis(1000)).await;
-
         enum McpInit {
             Succes,
             Failure,
@@ -441,11 +424,7 @@ impl Program {
             result = McpInit::Duplicate;
         }
 
-        spinner.finish_and_clear();
-        self.term.clear_last_lines(1).unwrap_or(());
-
-        // deno -A /home/lr/Development/mcp-playground/server/main.ts --stdio
-
+        println!();
         let message = match result {
             McpInit::Succes => {
                 self.cfg.add_mcp_client(client);
@@ -484,20 +463,23 @@ impl Program {
             .map(|client| format!("{} ({})", client.name(), client.version()))
             .collect::<Vec<String>>();
 
+        if items.is_empty() {
+            println!("\n{} No MCP servers configured\n\n", style("✗").red());
+            return;
+        }
+
         let defaults = clients
             .iter()
             .map(|client| client.is_enabled())
             .collect::<Vec<bool>>();
 
         let _ = self.term.clear_last_lines(1);
-        let Ok(selections) = MultiSelect::with_theme(&get_select_theme())
-            .with_prompt("Select MCP server (press Enter to confirm)")
+        let selections = MultiSelect::with_theme(&get_select_theme())
+            .with_prompt("Enable / disable MCP servers")
             .items(&items[..])
             .defaults(&defaults[..])
             .interact()
-        else {
-            std::process::exit(0);
-        };
+            .unwrap_or_else(|_| std::process::exit(0));
 
         for (i, client) in clients.iter_mut().enumerate() {
             client.set_enabled(selections.contains(&i));

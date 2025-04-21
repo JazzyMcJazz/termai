@@ -72,15 +72,21 @@ Run `termai` to start the program. Initially you will have to setup a provider w
 
 You can setup a provider by running `termai` and selecting `Options`. After setting up a provider you can change the model by going back into the Options menu.
 
+Use `termai --help` to see all available commands.
+
 ## Key Features
 
 ### **chat**
 
 *Start a conversational style chat with the AI. Conversations are forgotten when the program exits.*
 
+*Slash commands are available in chat mode. Type `/help` to see a list of available commands.*
+
 **Quick access**: `termai chat`
 
-**Quicker access** `termai chat hello world` 
+**Quicker access** `termai chat hello world`
+
+**Help**: `termai chat --help`
 
 ***
 
@@ -92,6 +98,8 @@ You can setup a provider by running `termai` and selecting `Options`. After sett
 
 **Quicker access**: `termai suggest list all files`
 
+**Help**: `termai suggest --help`
+
 ***
 
 ### **explain**
@@ -102,13 +110,7 @@ You can setup a provider by running `termai` and selecting `Options`. After sett
 
 **Quicker access**: `termai explain ls -alF`
 
-### **ask**
-
-*Ask a one-off question. Works like chat, but the program exits immediately after one response.*
-
-**Quick access**: `termai ask`
-
-**Quicker access**: `termai ask hello world`
+**Help**: `termai explain --help`
 
 # Disclaimer
 

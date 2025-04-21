@@ -7,14 +7,14 @@ use console::{strip_ansi_codes, style, Term};
 use futures::StreamExt;
 use indicatif::{ProgressBar, TermLike};
 use rig::message::Message;
-use rustyline::DefaultEditor;
 use termimad::MadSkin;
 use textwrap::wrap;
 
 use crate::{
-    ai::utils::{on_the_fly_change_model, NO_MODELS_FOUND_MSG},
+    ai::utils::{on_the_fly_change_model, on_the_fly_select_mcp_client, NO_MODELS_FOUND_MSG},
     client::StreamingContent,
     config::Config,
+    editor::{CommandHint, Editor},
     utils::console::get_spinner_style,
 };
 
@@ -41,43 +41,39 @@ pub async fn chat(
         }
     };
 
-    let exit_words = ["exit".into(), "q".into(), "quit".into(), "goodbye".into()];
-
     let ai = style("AI:").bold().green();
     let user = style("You:").bold().cyan();
 
-    let mut rl = DefaultEditor::new().expect("Failed to create editor");
     let skin = MadSkin::default();
     let mut spinner: ProgressBar;
     let spinner_style = get_spinner_style();
-    let mut select_model = false;
+    let mut streaming = cfg.streaming();
 
     // In memory message history
     let mut messages = vec![];
 
     if initial_message.is_none() {
-        println!("\n{ai}\nWhat can I help with?\n");
+        println!(
+            "\n 🚀 {}: Type {} to see available commands\n\n{ai}\nWhat can I help with?\n",
+            style("Quick Tip").bold().underlined(),
+            style("/help").bold(),
+        );
     } else {
         println!();
     }
+
+    let Ok(mut editor) = Editor::new(hints()) else {
+        eprintln!("Failed to create editor");
+        std::process::exit(1);
+    };
 
     loop {
         spinner = ProgressBar::new_spinner();
         spinner.set_style(spinner_style.clone());
 
-        if select_model {
-            select_model = false;
-            if let Some(p) = on_the_fly_change_model(&mut cfg.clone(), Some(provider.model())).await
-            {
-                provider = p;
-                println!();
-            } else {
-                println!("{}", style(NO_MODELS_FOUND_MSG).red());
-            }
-        }
-
         println!("{user}");
 
+        // Get user input
         let mut input = String::new();
         if let Some(message) = initial_message.take() {
             println!("{message}");
@@ -87,36 +83,62 @@ pub async fn chat(
             while input.trim().is_empty() {
                 term.clear_last_lines(1).expect("Failed to clear last line");
                 input.clear();
-                input = rl.readline("").unwrap_or("q".into());
+                input = editor.readline().unwrap_or("/quit".into());
             }
         }
 
         input = input.trim().to_string();
 
-        if input.eq("/model") {
-            select_model = true;
+        let _ = editor.append_history(&input);
+
+        if input.starts_with("/model") {
+            println!();
+            match on_the_fly_change_model(cfg, Some(provider.model())).await {
+                Some(p) => provider = p,
+                None => println!("{}", style(NO_MODELS_FOUND_MSG).red()),
+            }
             println!();
             continue;
         }
 
-        println!();
-
-        if exit_words.contains(&input.to_lowercase()) {
-            println!("{ai}\nGoodbye! 👋\n");
-            std::process::exit(0);
-        }
-
-        if input.eq("clear") {
+        if input.starts_with("/clear") {
             term.clear_screen().expect("Failed to clear screen");
             messages.clear();
             println!("{ai}\nWhat can I help with?\n");
             continue;
         }
 
+        if input.starts_with("/stream") || input.starts_with("/nostream") {
+            streaming = input.starts_with("/stream");
+            if streaming {
+                println!("\nStreaming enabled\n")
+            } else {
+                println!("\nStreaming disabled\n")
+            };
+            continue;
+        }
+
+        if input.starts_with("/mcp") {
+            println!();
+            on_the_fly_select_mcp_client(cfg);
+            println!();
+            continue;
+        }
+
+        match editor.execute_command(&input) {
+            Some(output) => input = output,
+            None => {
+                println!();
+                continue;
+            }
+        }
+
+        println!();
+
         spinner.enable_steady_tick(Duration::from_millis(100));
         spinner.set_message(format!("{ai}"));
 
-        if cfg.streaming() {
+        if streaming {
             let mut response = String::new();
             let mut final_response = String::new();
 
@@ -204,6 +226,45 @@ pub async fn chat(
             messages.push(Message::assistant(response));
         }
     }
+}
+
+fn hints() -> Vec<CommandHint> {
+    vec![
+        // Handled with custom logic (due to needing outside references)
+        CommandHint::new("/model", "/model", Box::new(|_| None)),
+        CommandHint::new("/clear", "/clear", Box::new(|_| None)),
+        CommandHint::new("/stream", "/stream", Box::new(|_| None)),
+        CommandHint::new("/nostream", "/nostream", Box::new(|_| None)),
+        CommandHint::new("/mcp", "/mcp", Box::new(|_| None)),
+        // Handled dynamically
+        CommandHint::new(
+            "/quit",
+            "/quit",
+            Box::new(|_| {
+                println!("\n{}\nGoodbye! 👋\n", style("AI:").bold().green());
+                std::process::exit(0);
+            }),
+        ),
+        CommandHint::new(
+            "/help",
+            "/help",
+            Box::new(|_| {
+                let s = |s: String| style(s).bold();
+                println!("\n{}", style("Slash Commands:").bold().underlined());
+                println!("  {}    - Change the active model", s("/model".into()));
+                println!("  {}      - Enable / disable MCP servers", s("/mcp".into()));
+                println!(
+                    "  {}    - Clear the screen and chat history",
+                    s("/clear".into())
+                ); // /clear
+                println!("  {}   - Enable streaming", s("/stream".into()));
+                println!("  {} - Disable streaming", s("/nostream".into()));
+                println!("  {}     - Exit TermAI", s("/quit".into()));
+                println!("  {}     - Show this help message", s("/help".into()));
+                None
+            }),
+        ),
+    ]
 }
 
 fn count_wrapped_lines(rendered: &str, width: usize) -> usize {

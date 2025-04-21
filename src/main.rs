@@ -2,6 +2,7 @@ mod ai;
 mod args;
 mod client;
 mod config;
+mod editor;
 mod mcp;
 mod program;
 mod provider;
