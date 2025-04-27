@@ -32,10 +32,13 @@ impl Client {
         messages: Vec<Message>,
         provider: &Provider,
         mcp_clients: &mut Vec<McpClient>,
+        search: bool,
     ) -> StreamingContentResult {
         let stream = match provider {
             Provider::Anthropic(settings) => {
-                let (_, api_key, model) = settings.get();
+                let (_, api_key, cm, sm) = settings.get();
+
+                let model = choose_model(search, &cm, &sm);
 
                 let client = rig::providers::anthropic::ClientBuilder::new(&api_key).build();
 
@@ -43,18 +46,20 @@ impl Client {
                     rig::providers::anthropic::completion::CompletionModel,
                 > = client.agent(&model).preamble(CHAT_PREAMBLE);
 
-                let agent = Self::build_agent(agent_builder, Some(mcp_clients)).await;
+                let agent = Self::build_agent(agent_builder, Some(mcp_clients), search).await;
 
                 StreamingMultiTurnAgent::multi_turn_prompt(prompt, agent, messages.clone()).await
             }
             Provider::OpenAI(settings) => {
-                let (_, api_key, model) = settings.get();
+                let (_, api_key, cm, sm) = settings.get();
+
+                let model = choose_model(search, &cm, &sm);
 
                 let agent_builder = rig::providers::openai::Client::new(&api_key)
                     .agent(&model)
                     .preamble(CHAT_PREAMBLE);
 
-                let agent = Self::build_agent(agent_builder, Some(mcp_clients)).await;
+                let agent = Self::build_agent(agent_builder, Some(mcp_clients), search).await;
 
                 StreamingMultiTurnAgent::multi_turn_prompt(prompt, agent, messages.clone()).await
             }
@@ -69,6 +74,7 @@ impl Client {
         provider: &Provider,
         mcp_clients: &mut Vec<McpClient>,
         spinner: &ProgressBar,
+        search: bool,
     ) -> Result<String, PromptError> {
         Self::chat_completion(
             prompt,
@@ -77,12 +83,22 @@ impl Client {
             provider,
             Some(mcp_clients),
             Some(spinner),
+            search,
         )
         .await
     }
 
     pub async fn suggest(prompt: &str, provider: &Provider) -> Result<String, PromptError> {
-        Self::chat_completion(prompt, SUGGEST_PREAMBLE, vec![], provider, None, None).await
+        Self::chat_completion(
+            prompt,
+            SUGGEST_PREAMBLE,
+            vec![],
+            provider,
+            None,
+            None,
+            false,
+        )
+        .await
     }
 
     pub async fn revise(
@@ -91,11 +107,29 @@ impl Client {
         provider: &Provider,
     ) -> Result<String, PromptError> {
         let messages = vec![Message::assistant(command_to_revise)];
-        Self::chat_completion(prompt, SUGGEST_PREAMBLE, messages, provider, None, None).await
+        Self::chat_completion(
+            prompt,
+            SUGGEST_PREAMBLE,
+            messages,
+            provider,
+            None,
+            None,
+            false,
+        )
+        .await
     }
 
     pub async fn explain(prompt: &str, provider: &Provider) -> Result<String, PromptError> {
-        Self::chat_completion(prompt, EXPLAIN_PREAMBLE, vec![], provider, None, None).await
+        Self::chat_completion(
+            prompt,
+            EXPLAIN_PREAMBLE,
+            vec![],
+            provider,
+            None,
+            None,
+            false,
+        )
+        .await
     }
 
     pub async fn fetch_models(provider: &Provider) -> Vec<(String, String)> {
@@ -124,6 +158,7 @@ impl Client {
         provider: &Provider,
         mcp_clients: Option<&mut Vec<McpClient>>,
         spinner: Option<&ProgressBar>,
+        search: bool,
     ) -> Result<String, PromptError> {
         let mut preamble = preamble.to_string();
 
@@ -133,26 +168,30 @@ impl Client {
 
         match provider {
             Provider::Anthropic(settings) => {
-                let (_, api_key, model) = settings.get();
+                let (_, api_key, cm, sm) = settings.get();
+
+                let model = choose_model(search, &cm, &sm);
 
                 let client = rig::providers::anthropic::ClientBuilder::new(&api_key).build();
 
                 let agent_builder = client.agent(&model).preamble(&preamble);
 
-                let agent = Self::build_agent(agent_builder, mcp_clients).await;
+                let agent = Self::build_agent(agent_builder, mcp_clients, search).await;
 
                 let mut agent = MultiTurnAgent::new(agent, messages.clone());
 
                 agent.multi_turn_prompt(prompt, spinner).await
             }
             Provider::OpenAI(settings) => {
-                let (_, api_key, model) = settings.get();
+                let (_, api_key, cm, sm) = settings.get();
+
+                let model = choose_model(search, &cm, &sm);
 
                 let agent_builder = rig::providers::openai::Client::new(&api_key)
                     .agent(&model)
                     .preamble(&preamble);
 
-                let agent = Self::build_agent(agent_builder, mcp_clients).await;
+                let agent = Self::build_agent(agent_builder, mcp_clients, search).await;
 
                 let mut agent = MultiTurnAgent::new(agent, messages.clone());
 
@@ -164,7 +203,12 @@ impl Client {
     async fn build_agent<M: CompletionModel>(
         agent_builder: AgentBuilder<M>,
         mcp_clients: Option<&mut Vec<McpClient>>,
+        skip_tools: bool,
     ) -> Agent<M> {
+        if skip_tools {
+            return agent_builder.build();
+        }
+
         if let Some(clients) = mcp_clients {
             let mut builder = agent_builder;
             for client in clients {
@@ -184,7 +228,7 @@ impl Client {
         let client = Reqwest::new();
         match provider {
             Provider::OpenAI(settings) => {
-                let (base_url, api_key, _) = settings.get();
+                let (base_url, api_key, _, _) = settings.get();
                 let url = format!("{base_url}/v1/models");
 
                 client
@@ -193,7 +237,7 @@ impl Client {
                     .bearer_auth(api_key)
             }
             Provider::Anthropic(settings) => {
-                let (base_url, api_key, _) = settings.get();
+                let (base_url, api_key, _, _) = settings.get();
                 let url = format!("{base_url}/v1/models");
 
                 client
@@ -219,5 +263,13 @@ impl Client {
         };
 
         res.extract_models()
+    }
+}
+
+fn choose_model(search: bool, completion_model: &str, search_model: &str) -> String {
+    if search {
+        search_model.to_string()
+    } else {
+        completion_model.to_string()
     }
 }

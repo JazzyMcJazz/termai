@@ -39,7 +39,7 @@ impl Program {
 
         let model = program
             .cfg
-            .active_model()
+            .active_model(false)
             .unwrap_or(("".into(), "None".into()));
         let active_model = format!(
             "{} {}",
@@ -96,6 +96,7 @@ impl Program {
                 vec![
                     "Configure Provider",
                     "Change Model",
+                    "Change Search Model",
                     stream_choice,
                     "Model Context Protocol (MCP)",
                     "Changelog",
@@ -121,7 +122,8 @@ impl Program {
 
             match selected_option {
                 "configure provider" => self.provider_menu().await,
-                "change model" => self.select_model_menu().await,
+                "change model" => self.select_model_menu(false).await,
+                "change search model" => self.select_model_menu(true).await,
                 "disable streaming" | "enable streaming (experimental)" => {
                     self.cfg.toggle_streaming()
                 }
@@ -186,11 +188,15 @@ impl Program {
         }
     }
 
-    async fn select_model_menu(&mut self) {
+    async fn select_model_menu(&mut self, search: bool) {
         self.cfg.refresh_available_models().await;
-        let provider_models = self.cfg.get_available_models().to_owned();
 
-        let active_model = if let Some(model) = self.cfg.active_model() {
+        let provider_models = match search {
+            true => self.cfg.available_search_models().to_owned(),
+            false => self.cfg.available_completion_models().to_owned(),
+        };
+
+        let active_model = if let Some(model) = self.cfg.active_model(search) {
             provider_models
                 .iter()
                 .position(|(_, m, _)| *m == model.0)
@@ -224,16 +230,24 @@ impl Program {
             return;
         };
 
-        self.cfg.set_model(*provider_name, model_id.to_owned());
+        match search {
+            true => self
+                .cfg
+                .set_search_model(*provider_name, model_id.to_owned()),
+            false => {
+                self.cfg
+                    .set_completion_model(*provider_name, model_id.to_owned());
 
-        let active_model = format!(
-            "{} {}",
-            style("Active model:").bold(),
-            style(model_name).cyan()
-        );
+                let active_model = format!(
+                    "{} {}",
+                    style("Active model:").bold(),
+                    style(model_name).cyan()
+                );
 
-        let _ = self.term.clear_last_lines(3);
-        println!("{active_model}\n\n");
+                let _ = self.term.clear_last_lines(3);
+                println!("{active_model}\n\n");
+            }
+        }
     }
 
     async fn mcp_menu(&mut self) {

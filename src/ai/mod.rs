@@ -24,9 +24,16 @@ impl AI<'_> {
         &mut self,
         initial_message: Option<String>,
         select_model: bool,
-        _search: bool,
+        search: bool,
     ) {
-        chat(self.term, self.cfg, initial_message, select_model).await;
+        chat(
+            self.term,
+            self.cfg,
+            initial_message,
+            select_model,
+            Some(search),
+        )
+        .await;
     }
 
     pub async fn explain(&self, query: Option<String>, select_model: bool) {

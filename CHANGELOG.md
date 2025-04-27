@@ -9,12 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Model Context Protocol (MCP) client implementation. Currently only tools are supported.
+- Model Context Protocol (MCP) client implementation. Currently only tools are supported (chat mode only).
 - Slash commands with tab completion (chat mode only). Type **/help** to see available commands.
+- Support for web search models that can be used with the **/search** command or **--search**/**-s** flag (chat mode only).
+- Support for the gpt-4.1-nano model from OpenAI.
 
 ### Changed
 
 - Changing model, either with the **--model** flag or the **/model** slash command, is now a permanent action.
+
+### Removed
+- Support for gpt-4.5-preview and o1 models.
 
 ## 0.4.1
 

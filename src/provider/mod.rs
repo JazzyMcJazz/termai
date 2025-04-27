@@ -14,15 +14,19 @@ pub mod llm_models;
 pub struct ProviderSettings {
     base_url: String,
     api_key: String,
-    model: String,
+    #[serde(rename = "model")]
+    completion_model: String,
+    #[serde(default)]
+    search_model: Option<String>,
 }
 
 impl ProviderSettings {
-    pub fn get(&self) -> (String, String, String) {
+    pub fn get(&self) -> (String, String, String, String) {
         (
             self.base_url.clone(),
             self.api_key.clone(),
-            self.model.clone(),
+            self.completion_model.clone(),
+            self.search_model.clone().unwrap_or_default(),
         )
     }
 }
@@ -34,7 +38,7 @@ pub enum Provider {
 }
 
 impl Provider {
-    pub async fn new(provider_name: ProviderName, api_key: String, model: Option<String>) -> Self {
+    pub async fn new(provider_name: ProviderName, api_key: String) -> Self {
         let base_url = match provider_name {
             ProviderName::OpenAI => "https://api.openai.com".into(),
             ProviderName::Anthropic => "https://api.anthropic.com".into(),
@@ -43,7 +47,8 @@ impl Provider {
         let settings = ProviderSettings {
             base_url,
             api_key,
-            model: model.to_owned().unwrap_or_default(),
+            completion_model: String::new(),
+            search_model: None,
         };
 
         let mut provider = match provider_name {
@@ -51,14 +56,16 @@ impl Provider {
             ProviderName::Anthropic => Provider::Anthropic(settings),
         };
 
-        if model.is_none() {
-            let models = provider.fetch_available_models().await;
-            if let Some((model, _)) = models.first() {
-                provider.set_model(model.clone());
-            } else {
-                eprint!("Failed to fetch models from {}", provider_name);
-                std::process::exit(1);
-            }
+        let (compleltion_models, search_models) = provider.fetch_available_models().await;
+        if let Some((model, _)) = compleltion_models.first() {
+            provider.set_completion_model(model.clone());
+        } else {
+            eprint!("Failed to fetch models from {}", provider_name);
+            std::process::exit(1);
+        }
+
+        if let Some((model, _)) = search_models.first() {
+            provider.set_search_model(model.clone());
         }
 
         provider
@@ -82,20 +89,38 @@ impl Provider {
         }
     }
 
-    pub fn model(&self) -> String {
+    pub fn completion_model(&self) -> String {
         match self {
-            Provider::OpenAI(settings) => settings.model.clone(),
-            Provider::Anthropic(settings) => settings.model.clone(),
+            Provider::OpenAI(settings) => settings.completion_model.clone(),
+            Provider::Anthropic(settings) => settings.completion_model.clone(),
         }
     }
 
-    pub fn set_model(&mut self, model: String) {
+    pub fn set_completion_model(&mut self, model: String) {
         match self {
             Provider::OpenAI(settings) => {
-                settings.model = model;
+                settings.completion_model = model;
             }
             Provider::Anthropic(settings) => {
-                settings.model = model;
+                settings.completion_model = model;
+            }
+        }
+    }
+
+    pub fn search_model(&self) -> Option<String> {
+        match self {
+            Provider::OpenAI(settings) => settings.search_model.clone(),
+            Provider::Anthropic(settings) => settings.search_model.clone(),
+        }
+    }
+
+    pub fn set_search_model(&mut self, model: String) {
+        match self {
+            Provider::OpenAI(settings) => {
+                settings.search_model = Some(model);
+            }
+            Provider::Anthropic(settings) => {
+                settings.search_model = Some(model);
             }
         }
     }
@@ -106,8 +131,9 @@ impl Provider {
         messages: Vec<Message>,
         mcp_clients: &mut Vec<McpClient>,
         spinner: &ProgressBar,
+        search: bool,
     ) -> Result<String, PromptError> {
-        Client::chat(prompt, messages, self, mcp_clients, spinner).await
+        Client::chat(prompt, messages, self, mcp_clients, spinner, search).await
     }
 
     pub async fn chat_stream(
@@ -115,8 +141,9 @@ impl Provider {
         prompt: &str,
         messages: Vec<Message>,
         mcp_clients: &mut Vec<McpClient>,
+        search: bool,
     ) -> StreamingContentResult {
-        Client::chat_stream(prompt, messages, self, mcp_clients).await
+        Client::chat_stream(prompt, messages, self, mcp_clients, search).await
     }
 
     pub async fn suggest(&self, prompt: &str) -> Result<String, PromptError> {
@@ -135,24 +162,40 @@ impl Provider {
         Client::explain(prompt, self).await
     }
 
-    pub async fn fetch_available_models(&self) -> Vec<(String, String)> {
+    pub async fn fetch_available_models(&self) -> (Vec<(String, String)>, Vec<(String, String)>) {
         let models = match self {
             Provider::OpenAI(_) => {
                 // Use available models from the API to filter supported models
                 let models = Client::fetch_models(self).await;
-                llm_models::OPENAI_MODELS
+                let completion_models = llm_models::OPENAI_COMPLETION_MODELS
                     .iter()
                     .filter(|(id, _)| models.iter().any(|(model, _)| model == id))
                     .map(|(id, name)| (id.to_string(), name.to_string()))
-                    .collect()
+                    .collect();
+
+                let search_models = llm_models::OPENAI_SEARCH_MODELS
+                    .iter()
+                    .filter(|(id, _)| models.iter().any(|(model, _)| model == id))
+                    .map(|(id, name)| (id.to_string(), name.to_string()))
+                    .collect::<Vec<_>>();
+
+                (completion_models, search_models)
             }
             Provider::Anthropic(_) => {
                 let models = Client::fetch_models(self).await;
-                llm_models::ANTHROPIC_MODELS
+                let completion_models = llm_models::ANTHROPIC_COMPLETION_MODELS
                     .iter()
                     .filter(|(id, _)| models.iter().any(|(model, _)| model == id))
                     .map(|(id, name)| (id.to_string(), name.to_string()))
-                    .collect()
+                    .collect();
+
+                let search_models = llm_models::ANTHROPIC_SEARCH_MODELS
+                    .iter()
+                    .filter(|(id, _)| models.iter().any(|(model, _)| model == id))
+                    .map(|(id, name)| (id.to_string(), name.to_string()))
+                    .collect::<Vec<_>>();
+
+                (completion_models, search_models)
             }
         };
 

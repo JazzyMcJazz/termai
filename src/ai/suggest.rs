@@ -26,7 +26,10 @@ pub async fn suggest(cfg: &Config, mut initial_query: Option<String>, select_mod
 
     if select_model {
         println!();
-        if let Some(p) = on_the_fly_change_model(&mut cfg.clone(), Some(provider.model())).await {
+        if let Some(p) =
+            on_the_fly_change_model(&mut cfg.clone(), Some(provider.completion_model()), false)
+                .await
+        {
             provider = p;
         } else {
             println!("{}", style(NO_MODELS_FOUND_MSG).red());

@@ -11,7 +11,10 @@ use termimad::MadSkin;
 use textwrap::wrap;
 
 use crate::{
-    ai::utils::{on_the_fly_change_model, on_the_fly_select_mcp_client, NO_MODELS_FOUND_MSG},
+    ai::utils::{
+        on_the_fly_change_model, on_the_fly_select_mcp_client, NO_MODELS_FOUND_MSG,
+        NO_SEARCH_MODELS_FOUND_MSG,
+    },
     client::StreamingContent,
     config::Config,
     editor::{CommandHint, Editor},
@@ -23,6 +26,7 @@ pub async fn chat(
     cfg: &mut Config,
     mut initial_message: Option<String>,
     select_model: bool,
+    mut search: Option<bool>,
 ) {
     let mut provider = cfg
         .active_provider()
@@ -32,9 +36,14 @@ pub async fn chat(
         })
         .clone();
 
+    let mut search_provider = cfg.active_search_provider().cloned();
+
     if select_model {
         println!();
-        if let Some(p) = on_the_fly_change_model(&mut cfg.clone(), Some(provider.model())).await {
+        if let Some(p) =
+            on_the_fly_change_model(&mut cfg.clone(), Some(provider.completion_model()), false)
+                .await
+        {
             provider = p;
         } else {
             println!("{}", style(NO_MODELS_FOUND_MSG).red());
@@ -68,6 +77,8 @@ pub async fn chat(
     };
 
     loop {
+        let mut search = search.take().unwrap_or_default();
+
         spinner = ProgressBar::new_spinner();
         spinner.set_style(spinner_style.clone());
 
@@ -93,7 +104,7 @@ pub async fn chat(
 
         if input.starts_with("/model") {
             println!();
-            match on_the_fly_change_model(cfg, Some(provider.model())).await {
+            match on_the_fly_change_model(cfg, Some(provider.completion_model()), false).await {
                 Some(p) => provider = p,
                 None => println!("{}", style(NO_MODELS_FOUND_MSG).red()),
             }
@@ -101,7 +112,21 @@ pub async fn chat(
             continue;
         }
 
-        if input.starts_with("/clear") {
+        if input.starts_with("/search-model") {
+            println!();
+            let model_id = search_provider
+                .as_ref()
+                .and_then(|p| p.search_model().map(|m| m.to_string()));
+
+            match on_the_fly_change_model(cfg, model_id, true).await {
+                Some(p) => search_provider = Some(p),
+                None => println!("{}", style(NO_SEARCH_MODELS_FOUND_MSG).red()),
+            }
+            println!();
+            continue;
+        }
+
+        if input.starts_with("/clear") | input.eq("clear") {
             term.clear_screen().expect("Failed to clear screen");
             messages.clear();
             println!("{ai}\nWhat can I help with?\n");
@@ -111,9 +136,9 @@ pub async fn chat(
         if input.starts_with("/stream") || input.starts_with("/nostream") {
             streaming = input.starts_with("/stream");
             if streaming {
-                println!("\nStreaming enabled\n")
+                println!("\n{} Streaming enabled\n", style("✔").green());
             } else {
-                println!("\nStreaming disabled\n")
+                println!("\n{} Streaming disabled\n", style("✗").red());
             };
             continue;
         }
@@ -123,6 +148,15 @@ pub async fn chat(
             on_the_fly_select_mcp_client(cfg);
             println!();
             continue;
+        }
+
+        if input.starts_with("/search") {
+            input = input.trim_start_matches("/search").trim().to_string();
+            if input.is_empty() {
+                println!("\n{} Please provide a search query\n", style("✗").red());
+                continue;
+            }
+            search = true;
         }
 
         match editor.execute_command(&input) {
@@ -142,9 +176,17 @@ pub async fn chat(
             let mut response = String::new();
             let mut final_response = String::new();
 
-            let mut stream = provider
-                .chat_stream(&input, messages.clone(), cfg.mcp_clients())
-                .await;
+            let mut stream = if search {
+                search_provider
+                    .as_ref()
+                    .expect("Search provider not set")
+                    .chat_stream(&input, messages.clone(), cfg.mcp_clients(), true)
+                    .await
+            } else {
+                provider
+                    .chat_stream(&input, messages.clone(), cfg.mcp_clients(), false)
+                    .await
+            };
 
             let mut line_count = 0;
 
@@ -209,10 +251,19 @@ pub async fn chat(
             let _ = term.show_cursor();
             let _ = term.flush();
         } else {
-            let response = match provider
-                .chat(&input, messages.clone(), cfg.mcp_clients(), &spinner)
-                .await
-            {
+            let response = if search {
+                search_provider
+                    .as_ref()
+                    .expect("Search provider not set")
+                    .chat(&input, messages.clone(), cfg.mcp_clients(), &spinner, true)
+                    .await
+            } else {
+                provider
+                    .chat(&input, messages.clone(), cfg.mcp_clients(), &spinner, false)
+                    .await
+            };
+
+            let response = match response {
                 Ok(response) => response,
                 Err(e) => e.to_string(),
             };
@@ -232,6 +283,8 @@ fn hints() -> Vec<CommandHint> {
     vec![
         // Handled with custom logic (due to needing outside references)
         CommandHint::new("/model", "/model", Box::new(|_| None)),
+        CommandHint::new("/search-model", "/search-model", Box::new(|_| None)),
+        CommandHint::new("/search ", "/search ", Box::new(|_| None)),
         CommandHint::new("/clear", "/clear", Box::new(|_| None)),
         CommandHint::new("/stream", "/stream", Box::new(|_| None)),
         CommandHint::new("/nostream", "/nostream", Box::new(|_| None)),
@@ -250,17 +303,32 @@ fn hints() -> Vec<CommandHint> {
             "/help",
             Box::new(|_| {
                 let s = |s: String| style(s).bold();
-                println!("\n{}", style("Slash Commands:").bold().underlined());
-                println!("  {}    - Change the active model", s("/model".into()));
-                println!("  {}      - Enable / disable MCP servers", s("/mcp".into()));
+                println!("\n{}", style("Prompt Commands:").bold().underlined());
                 println!(
-                    "  {}    - Clear the screen and chat history",
+                    "  {}       - Search the web with the active search model",
+                    s("/search".into())
+                );
+                println!("\n{}", style("Other Commands:").bold().underlined());
+                println!(
+                    "  {}        - Change the active completion model",
+                    s("/model".into())
+                );
+                println!(
+                    "  {} - Change the active search model",
+                    s("/search-model".into())
+                );
+                println!("  {}       - Enable streaming", s("/stream".into()));
+                println!("  {}     - Disable streaming", s("/nostream".into()));
+                println!(
+                    "  {}          - Select active MCP servers",
+                    s("/mcp".into())
+                );
+                println!(
+                    "  {}        - Clear the screen and chat history",
                     s("/clear".into())
                 ); // /clear
-                println!("  {}   - Enable streaming", s("/stream".into()));
-                println!("  {} - Disable streaming", s("/nostream".into()));
-                println!("  {}     - Exit TermAI", s("/quit".into()));
-                println!("  {}     - Show this help message", s("/help".into()));
+                println!("  {}         - Exit TermAI", s("/quit".into()));
+                println!("  {}         - Show this help message", s("/help".into()));
                 None
             }),
         ),

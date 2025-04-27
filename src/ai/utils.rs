@@ -6,16 +6,23 @@ use crate::{config::Config, provider::Provider, utils::console::get_select_theme
 pub const NO_MODELS_FOUND_MSG: &str =
     "Unable to change model. Select a model in the Options menu to fix this issue.";
 
+pub const NO_SEARCH_MODELS_FOUND_MSG: &str = "No search models available.";
+
 pub async fn on_the_fly_change_model(
     cfg: &mut Config,
     active_model_id: Option<String>,
+    search: bool,
 ) -> Option<Provider> {
-    let models = cfg.get_available_models().to_owned();
+    let models = if search {
+        cfg.available_search_models().to_owned()
+    } else {
+        cfg.available_completion_models().to_owned()
+    };
 
     // Find the index of the active model
     let active_model = if let Some(model) = active_model_id {
         models.iter().position(|(_, m, _)| *m == model).unwrap_or(0)
-    } else if let Some(model) = cfg.active_model() {
+    } else if let Some(model) = cfg.active_model(search) {
         models
             .iter()
             .position(|(_, m, _)| *m == model.0)
@@ -52,13 +59,21 @@ pub async fn on_the_fly_change_model(
         return None;
     };
 
-    cfg.set_model(provider_name.to_owned(), model_id.to_owned());
+    if search {
+        cfg.set_search_model(provider_name.to_owned(), model_id.to_owned());
+    } else {
+        cfg.set_completion_model(provider_name.to_owned(), model_id.to_owned());
+    }
 
     let provider = cfg.find_provider(provider_name);
     match provider {
         Some(p) => {
             let mut provider = p.clone();
-            provider.set_model(model_id.to_string());
+            if search {
+                provider.set_search_model(model_id.to_string());
+            } else {
+                provider.set_completion_model(model_id.to_string());
+            }
             Some(provider)
         }
         None => None,

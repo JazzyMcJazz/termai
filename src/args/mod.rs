@@ -24,11 +24,11 @@ impl Args {
             .action(ArgAction::SetTrue)
             .help("Specify the AI model to use");
 
-        // let search_arg = Arg::new("search")
-        //     .short('s')
-        //     .long("search")
-        //     .action(ArgAction::SetTrue)
-        //     .help("Search the web (requires OpenAI or Perplexity API key)");
+        let search_arg = Arg::new("search")
+            .short('s')
+            .long("search")
+            .action(ArgAction::SetTrue)
+            .help("Search the web (requires OpenAI or Perplexity API key)");
 
         let prompt_arg = Arg::new("prompt")
             .help("The prompt to send to the AI")
@@ -43,7 +43,7 @@ impl Args {
                     .arg(model_arg.to_owned().help(
                         "Specify the AI model to use (You can also use /model in an active chat)",
                     ))
-                    // .arg(search_arg.to_owned())
+                    .arg(search_arg.to_owned())
                     .arg(prompt_arg.to_owned()),
             )
             .subcommand(
@@ -89,7 +89,7 @@ impl ChatArgs {
 
     pub fn search(&self) -> bool {
         match self.0.subcommand() {
-            Some((_, _args)) => false, //args.try_contains_id("search").is_ok() && args.get_flag("search"),
+            Some((_, args)) => args.try_contains_id("search").is_ok() && args.get_flag("search"),
             None => false,
         }
     }
