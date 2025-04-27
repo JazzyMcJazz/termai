@@ -2253,7 +2253,7 @@ dependencies = [
 [[package]]
 name = "rig-core"
 version = "0.11.1"
-source = "git+https://github.com/JazzyMcJazz/rig.git?branch=dev#89f3c16403a3fbe5ae5674f79397dd3661c61745"
+source = "git+https://github.com/JazzyMcJazz/rig.git?branch=feat%2Fmulti-turn-streaming#f962b744685adc98b9f18d79479ae72c33440d33"
 dependencies = [
  "async-stream",
  "base64",

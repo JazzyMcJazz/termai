@@ -1,12 +1,10 @@
-// mod agent;
 mod agents;
 mod constants;
+mod enums;
+mod finish_reason;
 mod models;
 mod streaming;
 mod traits;
-
-// use streaming::handle_stream;
-// pub use streaming::StreamingContentResult;
 
 use indicatif::ProgressBar;
 use reqwest::{Client as Reqwest, RequestBuilder};
@@ -19,7 +17,6 @@ use serde::de::DeserializeOwned;
 
 use crate::{mcp::McpClient, provider::Provider, utils::shell::detect_shell_environment};
 
-// use agent::MultiTurnAgent;
 use agents::{MultiTurnAgent, StreamingMultiTurnAgent};
 use constants::{CHAT_PREAMBLE, EXPLAIN_PREAMBLE, SUGGEST_PREAMBLE};
 use models::{anthropic, openai};
@@ -47,8 +44,8 @@ impl Client {
                 > = client.agent(&model).preamble(CHAT_PREAMBLE);
 
                 let agent = Self::build_agent(agent_builder, Some(mcp_clients)).await;
+
                 StreamingMultiTurnAgent::multi_turn_prompt(prompt, agent, messages.clone()).await
-                // agent.multi_turn_prompt(prompt).await
             }
             Provider::OpenAI(settings) => {
                 let (_, api_key, model) = settings.get();
@@ -58,6 +55,7 @@ impl Client {
                     .preamble(CHAT_PREAMBLE);
 
                 let agent = Self::build_agent(agent_builder, Some(mcp_clients)).await;
+
                 StreamingMultiTurnAgent::multi_turn_prompt(prompt, agent, messages.clone()).await
             }
         };

@@ -41,7 +41,7 @@ impl StreamingMultiTurnAgent {
             let mut i = 0;
 
             'outer: loop {
-                let mut s = agent
+                let mut stream = agent
                     .stream_completion(current_prompt.to_owned(), chat_history.to_owned())
                     .await?
                     .stream()
@@ -52,7 +52,7 @@ impl StreamingMultiTurnAgent {
                 let mut tool_calls = vec![];
                 let mut tool_results = vec![];
 
-                while let Some(chunk) = s.next().await {
+                while let Some(chunk) = stream.next().await {
                     match chunk {
                         Ok(StreamingChoice::Message(text)) => {
                             if did_call_tool && did_write_message {

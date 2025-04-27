@@ -8,14 +8,24 @@ use rig::{
 
 use anyhow::Result;
 
+use crate::client::{enums::StopReason, traits::CompetionResponseExt};
+
 use super::util::confirm_tool_call;
 
-pub struct MultiTurnAgent<M: CompletionModel> {
+pub struct MultiTurnAgent<M>
+where
+    M: CompletionModel,
+    <M as CompletionModel>::Response: CompetionResponseExt,
+{
     agent: Agent<M>,
     chat_history: Vec<Message>,
 }
 
-impl<M: CompletionModel> MultiTurnAgent<M> {
+impl<M> MultiTurnAgent<M>
+where
+    M: CompletionModel,
+    <M as CompletionModel>::Response: CompetionResponseExt,
+{
     pub fn new(agent: Agent<M>, chat_history: Vec<Message>) -> Self {
         Self {
             agent,
@@ -36,7 +46,6 @@ impl<M: CompletionModel> MultiTurnAgent<M> {
                 .await?
                 .send()
                 .await?;
-
             self.chat_history.push(current_prompt.to_owned());
 
             let mut final_text = None;
@@ -87,8 +96,12 @@ impl<M: CompletionModel> MultiTurnAgent<M> {
                 }
             }
 
-            if let Some(text) = final_text {
-                return Ok(text);
+            // Stop if stop reason is not tool call or None
+            if !matches!(
+                res.raw_response.stop_reason(),
+                StopReason::ToolCall | StopReason::None
+            ) {
+                return Ok(final_text.unwrap_or_default());
             }
         }
     }

@@ -17,6 +17,7 @@ pub struct ClientStdioInfo {
     pub program: String,
     pub args: Vec<String>,
     pub enabled: bool,
+    pub tools: Vec<Tool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,13 +26,12 @@ pub struct ClientSseInfo {
     pub version: String,
     pub url: String,
     pub enabled: bool,
+    pub tools: Vec<Tool>,
 }
 
 #[derive(Clone)]
 pub enum McpClient {
-    /// Server name, client, command, arguments, enabled
     StdIo(Client<ClientStdioTransport>, ClientStdioInfo),
-    /// Server name, client, url, enabled
     Sse(Client<ClientSseTransport>, ClientSseInfo),
 }
 
@@ -68,16 +68,18 @@ impl McpClient {
         match self {
             McpClient::StdIo(client, info) => {
                 if client.assert_initialized().await.is_err() {
-                    let res = Self::initialize_inner(client).await?;
+                    let (res, tools) = initialize_client(client).await?;
                     info.name = res.server_info.name;
                     info.version = res.server_info.version;
+                    info.tools = tools;
                 }
             }
             McpClient::Sse(client, info) => {
                 if client.assert_initialized().await.is_err() {
-                    let res = Self::initialize_inner(client).await?;
+                    let (res, tools) = initialize_client(client).await?;
                     info.name = res.server_info.name;
                     info.version = res.server_info.version;
+                    info.tools = tools;
                 }
             }
         }
@@ -92,55 +94,19 @@ impl McpClient {
         let tools = self.tools().await;
 
         match self {
-            McpClient::StdIo(client, _) => {
-                tools.into_iter().fold(agent_builder, |builder, tool| {
-                    builder.mcp_tool(tool, client.clone())
-                })
-            }
-            McpClient::Sse(client, _) => tools.into_iter().fold(agent_builder, |builder, tool| {
-                builder.mcp_tool(tool, client.clone())
+            McpClient::StdIo(client, _) => tools.iter().fold(agent_builder, |builder, tool| {
+                builder.mcp_tool(tool.clone(), client.clone())
+            }),
+            McpClient::Sse(client, _) => tools.iter().fold(agent_builder, |builder, tool| {
+                builder.mcp_tool(tool.clone(), client.clone())
             }),
         }
     }
 
-    async fn initialize_inner<T: Transport>(client: &Client<T>) -> Result<InitializeResponse> {
-        client.open().await?;
-
-        let res = client
-            .initialize(
-                Implementation {
-                    name: "termai-mcp-client".to_string(),
-                    version: VERSION.to_string(),
-                },
-                ClientCapabilities {
-                    experimental: Some(json!({})),
-                    roots: Some(RootCapabilities {
-                        list_changed: Some(false),
-                    }),
-                    sampling: Some(json!({})),
-                },
-            )
-            .await?;
-
-        Ok(res)
-    }
-
-    async fn tools(&self) -> Vec<Tool> {
+    async fn tools(&self) -> &Vec<Tool> {
         match self {
-            McpClient::StdIo(client, _) => match client.list_tools(None, None).await {
-                Ok(tools) => tools.tools,
-                Err(e) => {
-                    eprintln!("Error listing tools: {}", e);
-                    vec![]
-                }
-            },
-            McpClient::Sse(client, _) => match client.list_tools(None, None).await {
-                Ok(tools) => tools.tools,
-                Err(e) => {
-                    eprintln!("Error listing tools: {}", e);
-                    vec![]
-                }
-            },
+            McpClient::StdIo(_, info) => &info.tools,
+            McpClient::Sse(_, info) => &info.tools,
         }
     }
 }
@@ -161,6 +127,7 @@ impl From<McpClientConfig> for McpClient {
                         program,
                         args,
                         enabled,
+                        tools: vec![],
                     },
                 )
             }
@@ -174,6 +141,7 @@ impl From<McpClientConfig> for McpClient {
                         version,
                         url,
                         enabled,
+                        tools: vec![],
                     },
                 )
             }
@@ -223,4 +191,33 @@ impl<'de> Deserialize<'de> for McpClient {
         let client = McpClient::from(config);
         Ok(client)
     }
+}
+
+async fn initialize_client<T: Transport>(
+    client: &Client<T>,
+) -> Result<(InitializeResponse, Vec<Tool>)> {
+    client.open().await?;
+
+    let res = client
+        .initialize(
+            Implementation {
+                name: "termai".to_string(),
+                version: VERSION.to_string(),
+            },
+            ClientCapabilities {
+                experimental: Some(json!({})),
+                roots: Some(RootCapabilities {
+                    list_changed: Some(false),
+                }),
+                sampling: Some(json!({})),
+            },
+        )
+        .await?;
+
+    let tools = match client.list_tools(None, None).await {
+        Ok(res) => res.tools,
+        Err(_) => vec![],
+    };
+
+    Ok((res, tools))
 }
