@@ -3,8 +3,8 @@ use futures::{Stream, StreamExt};
 use rig::{
     agent::Agent,
     completion::PromptError,
-    message::{AssistantContent, Message, ToolCall, ToolFunction, ToolResultContent, UserContent},
-    streaming::{StreamingChoice, StreamingCompletion, StreamingCompletionModel},
+    message::{AssistantContent, Message, Text, ToolResultContent, UserContent},
+    streaming::{StreamingCompletion, StreamingCompletionModel},
     OneOrMany,
 };
 use std::pin::Pin;
@@ -26,11 +26,15 @@ pub enum StreamingContent {
 pub struct StreamingMultiTurnAgent;
 
 impl StreamingMultiTurnAgent {
-    pub async fn multi_turn_prompt<M: StreamingCompletionModel + Send + Sync + 'static>(
+    pub async fn multi_turn_prompt<M>(
         prompt: impl Into<Message> + Send,
         agent: Agent<M>,
         mut chat_history: Vec<Message>,
-    ) -> StreamingContentResult {
+    ) -> StreamingContentResult
+    where
+        M: StreamingCompletionModel + 'static,
+        <M as StreamingCompletionModel>::StreamingResponse: std::marker::Send,
+    {
         let prompt: Message = prompt.into();
 
         (Box::pin(stream! {
@@ -38,7 +42,6 @@ impl StreamingMultiTurnAgent {
             let mut did_write_message = false;
             let mut did_call_tool = false;
             let mut finish = false;
-            let mut i = 0;
 
             'outer: loop {
                 let mut stream = agent
@@ -54,7 +57,7 @@ impl StreamingMultiTurnAgent {
 
                 while let Some(chunk) = stream.next().await {
                     match chunk {
-                        Ok(StreamingChoice::Message(text)) => {
+                        Ok(AssistantContent::Text(Text { text })) => {
                             if did_call_tool && did_write_message {
                                 yield Ok(StreamingContent::Text("\n".to_string()));
                             }
@@ -64,7 +67,7 @@ impl StreamingMultiTurnAgent {
                             did_call_tool = false;
                             finish = true;
                         }
-                        Ok(StreamingChoice::ToolCall(name, id, arguments)) => {
+                        Ok(AssistantContent::ToolCall(tool_call)) => {
                             if did_write_message {
                                 yield Ok(StreamingContent::Text("\n".to_string()));
                             }
@@ -73,11 +76,11 @@ impl StreamingMultiTurnAgent {
                             finish = false;
 
                             yield Ok(StreamingContent::PauseSpinner);
-                            let confirmation = confirm_tool_call(&name, None);
+                            let confirmation = confirm_tool_call(&tool_call.function.name, None);
                             yield Ok(StreamingContent::StartSpinner);
 
                             let tool_result = if confirmation {
-                                match agent.tools.call(&name, arguments.to_string()).await {
+                                match agent.tools.call(&tool_call.function.name, tool_call.function.arguments.to_string()).await {
                                     Ok(res) => res,
                                     Err(e) => e.to_string(),
                                 }
@@ -85,20 +88,9 @@ impl StreamingMultiTurnAgent {
                                 "Cancelled by user".to_string()
                             };
 
-                            let id = if id.is_empty() {
-                                i += 1;
-                                format!("call_{}", i)
-                            } else {
-                                id
-                            };
-
-                            let tool_call = ToolCall {
-                                id: id.to_owned(),
-                                function: ToolFunction { name, arguments }
-                            };
                             let tool_call_msg = AssistantContent::ToolCall(tool_call.to_owned());
                             tool_calls.push(tool_call_msg);
-                            tool_results.push((id, tool_result));
+                            tool_results.push((tool_call.id, tool_result));
                         }
                         Err(_) => {
                             break 'outer;
@@ -129,7 +121,6 @@ impl StreamingMultiTurnAgent {
                     break 'outer;
                 }
             }
-
         })) as _
     }
 }

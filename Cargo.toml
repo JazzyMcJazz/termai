@@ -28,14 +28,12 @@ futures = "0.3.31"
 hex = "0.4.3"
 indicatif = "0.17.11"
 keyring = { version = "3.6.2", features = ["sync-secret-service", "apple-native", "windows-native"] }
-mcp-core = { version = "0.1.43", features = ["sse"] }
+mcp-core = { version = "=0.1.46", features = ["sse"] }
 radix_trie = "0.2.1"
 rand = "0.9.0"
 reqwest = { version = "0.12.15", features = ["json"] }
-# rig-core = { version = "0.11.1", features = ["mcp"] }
-# rig-core = { path = "../rig/rig-core", features = ["mcp"] }
-rig-core = { git = "https://github.com/JazzyMcJazz/rig.git", branch = "feat/multi-turn-streaming", features = ["mcp"] }
-# rig-core = { git = "https://github.com/0xPlaygrounds/rig.git", branch = "refactor/streaming", features = ["mcp"] }
+# rig-core = { version = "0.12.0", features = ["mcp"] }
+rig-core = { git = "https://github.com/0xPlaygrounds/rig.git", branch = "main", features = ["mcp"] }
 rustyline = { version = "15.0.0", features = ["derive"] }
 serde = "1.0.219"
 serde_json = "1.0.140"
