@@ -77,11 +77,7 @@ impl ChatArgs {
     pub fn model(&self) -> bool {
         match self.0.subcommand() {
             Some((_, args)) => {
-                if let Ok(contains_id) = args.try_contains_id("model") {
-                    contains_id && args.get_flag("model")
-                } else {
-                    false
-                }
+                args.try_contains_id("model").unwrap_or(false) && args.get_flag("model")
             }
             None => false,
         }
@@ -89,7 +85,9 @@ impl ChatArgs {
 
     pub fn search(&self) -> bool {
         match self.0.subcommand() {
-            Some((_, args)) => args.try_contains_id("search").is_ok() && args.get_flag("search"),
+            Some((_, args)) => {
+                args.try_contains_id("search").unwrap_or(false) && args.get_flag("search")
+            }
             None => false,
         }
     }
