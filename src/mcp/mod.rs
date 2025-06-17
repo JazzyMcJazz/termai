@@ -2,13 +2,11 @@ use anyhow::Result;
 use mcp_core::{
     client::{Client, ClientBuilder},
     transport::{ClientSseTransport, ClientSseTransportBuilder, ClientStdioTransport, Transport},
-    types::{ClientCapabilities, Implementation, InitializeResponse, RootCapabilities, Tool},
+    types::{ClientCapabilities, InitializeResponse, RootCapabilities, Tool},
 };
 use rig::{agent::AgentBuilder, completion::CompletionModel};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-
-use crate::program::VERSION;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClientStdioInfo {
@@ -118,7 +116,17 @@ impl From<McpClientConfig> for McpClient {
                 let program_args: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
                 let transport = ClientStdioTransport::new(&program, &program_args)
                     .expect("Failed to create transport");
-                let client = ClientBuilder::new(transport).build();
+                let client = ClientBuilder::new(transport)
+                    .set_protocol_version(mcp_core::types::ProtocolVersion::V2025_03_26)
+                    .set_client_info(name.to_owned(), version.to_owned())
+                    .set_capabilities(ClientCapabilities {
+                        experimental: Some(json!({})),
+                        roots: Some(RootCapabilities {
+                            list_changed: Some(false),
+                        }),
+                        sampling: Some(json!({})),
+                    })
+                    .build();
                 McpClient::StdIo(
                     client,
                     ClientStdioInfo {
@@ -133,7 +141,17 @@ impl From<McpClientConfig> for McpClient {
             }
             McpClientConfig::Sse(name, version, url, enabled) => {
                 let transport = ClientSseTransportBuilder::new(url.clone()).build();
-                let client = ClientBuilder::new(transport).build();
+                let client = ClientBuilder::new(transport)
+                    .set_protocol_version(mcp_core::types::ProtocolVersion::V2025_03_26)
+                    .set_client_info(name.to_owned(), version.to_owned())
+                    .set_capabilities(ClientCapabilities {
+                        experimental: Some(json!({})),
+                        roots: Some(RootCapabilities {
+                            list_changed: Some(false),
+                        }),
+                        sampling: Some(json!({})),
+                    })
+                    .build();
                 McpClient::Sse(
                     client,
                     ClientSseInfo {
@@ -198,21 +216,7 @@ async fn initialize_client<T: Transport>(
 ) -> Result<(InitializeResponse, Vec<Tool>)> {
     client.open().await?;
 
-    let res = client
-        .initialize(
-            Implementation {
-                name: "termai".to_string(),
-                version: VERSION.to_string(),
-            },
-            ClientCapabilities {
-                experimental: Some(json!({})),
-                roots: Some(RootCapabilities {
-                    list_changed: Some(false),
-                }),
-                sampling: Some(json!({})),
-            },
-        )
-        .await?;
+    let res = client.initialize().await?;
 
     let tools = match client.list_tools(None, None).await {
         Ok(res) => res.tools,

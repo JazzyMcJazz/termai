@@ -2,9 +2,9 @@ use async_stream::stream;
 use futures::{Stream, StreamExt};
 use rig::{
     agent::Agent,
-    completion::PromptError,
+    completion::{CompletionModel, PromptError},
     message::{AssistantContent, Message, Text, ToolResultContent, UserContent},
-    streaming::{StreamingCompletion, StreamingCompletionModel},
+    streaming::StreamingCompletion,
     OneOrMany,
 };
 use std::pin::Pin;
@@ -32,8 +32,8 @@ impl StreamingMultiTurnAgent {
         mut chat_history: Vec<Message>,
     ) -> StreamingContentResult
     where
-        M: StreamingCompletionModel + 'static,
-        <M as StreamingCompletionModel>::StreamingResponse: std::marker::Send,
+        M: CompletionModel + 'static,
+        <M as CompletionModel>::StreamingResponse: std::marker::Send,
     {
         let prompt: Message = prompt.into();
 

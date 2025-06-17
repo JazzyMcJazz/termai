@@ -408,23 +408,32 @@ impl Program {
         };
 
         let mut client: McpClient = match args {
-            Some(args) => {
-                McpClientConfig::StdIo(String::new(), String::new(), command_or_url, args, false)
-            }
-            None => McpClientConfig::Sse(String::new(), String::new(), command_or_url, false),
+            Some(args) => McpClientConfig::StdIo(
+                "termai".to_string(),
+                VERSION.to_string(),
+                command_or_url,
+                args,
+                false,
+            ),
+            None => McpClientConfig::Sse(
+                "termai".to_string(),
+                VERSION.to_string(),
+                command_or_url,
+                false,
+            ),
         }
         .into();
 
         enum McpInit {
             Succes,
-            Failure,
+            Failure(String),
             Duplicate,
         }
 
         // Test the connection
         let mut result = match client.initialize().await {
             Ok(_) => McpInit::Succes,
-            Err(_) => McpInit::Failure,
+            Err(e) => McpInit::Failure(e.to_string()),
         };
 
         if self
@@ -456,11 +465,11 @@ impl Program {
                     style("is already configured.").bold(),
                 )
             }
-            McpInit::Failure => {
+            McpInit::Failure(e) => {
                 format!(
-                    "{} {}",
+                    "{} {} {e}",
                     style("✗").red(),
-                    style("Connection failed.").bold()
+                    style("Connection failed:").bold()
                 )
             }
         };

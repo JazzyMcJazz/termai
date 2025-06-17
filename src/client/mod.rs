@@ -10,6 +10,7 @@ use indicatif::ProgressBar;
 use reqwest::{Client as Reqwest, RequestBuilder};
 use rig::{
     agent::{Agent, AgentBuilder},
+    client::CompletionClient,
     completion::{CompletionModel, PromptError},
     message::Message,
 };
@@ -44,7 +45,10 @@ impl Client {
 
                 let agent_builder: AgentBuilder<
                     rig::providers::anthropic::completion::CompletionModel,
-                > = client.agent(&model).preamble(CHAT_PREAMBLE);
+                > = client
+                    .agent(&model)
+                    .max_tokens(get_max_tokens(&model))
+                    .preamble(CHAT_PREAMBLE);
 
                 let agent = Self::build_agent(agent_builder, Some(mcp_clients), search).await;
 
@@ -174,7 +178,10 @@ impl Client {
 
                 let client = rig::providers::anthropic::ClientBuilder::new(&api_key).build();
 
-                let agent_builder = client.agent(&model).preamble(&preamble);
+                let agent_builder = client
+                    .agent(&model)
+                    .max_tokens(get_max_tokens(&model))
+                    .preamble(&preamble);
 
                 let agent = Self::build_agent(agent_builder, mcp_clients, search).await;
 
@@ -201,7 +208,7 @@ impl Client {
     }
 
     async fn build_agent<M: CompletionModel>(
-        agent_builder: AgentBuilder<M>,
+        mut agent_builder: AgentBuilder<M>,
         mcp_clients: Option<&mut Vec<McpClient>>,
         skip_tools: bool,
     ) -> Agent<M> {
@@ -210,15 +217,14 @@ impl Client {
         }
 
         if let Some(clients) = mcp_clients {
-            let mut builder = agent_builder;
             for client in clients {
                 // Add tool from MCP client if enabled and initialized
                 if client.is_enabled() && client.initialize().await.is_ok() {
-                    builder = client.add_tools(builder).await;
+                    agent_builder = client.add_tools(agent_builder).await;
                 }
             }
 
-            builder.build()
+            agent_builder.build()
         } else {
             agent_builder.build()
         }
@@ -271,5 +277,15 @@ fn choose_model(search: bool, completion_model: &str, search_model: &str) -> Str
         search_model.to_string()
     } else {
         completion_model.to_string()
+    }
+}
+
+fn get_max_tokens(model: &str) -> u64 {
+    match model {
+        "claude-sonnet-4-20250514" | "claude-3-7-sonnet-20250219" => 64_000,
+        "claude-opus-4-20250514" => 32_000,
+        "claude-3-5-sonnet-20241022" => 8192,
+        "claude-3-5-haiku-20241022" | "claude-3-opus-20240229" => 4096,
+        _ => 4096,
     }
 }

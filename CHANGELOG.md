@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Slash commands with tab completion (chat mode only). Type **/help** to see available commands.
 - Support for web search models that can be used with the **/search** command or **--search**/**-s** flag (chat mode only).
 - Support for the gpt-4.1-nano model from OpenAI.
+- Support for the claude-sonnet-4 and claude-opus-4 models from Anthropic.
 
 ### Changed
 
